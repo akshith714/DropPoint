@@ -106,6 +106,11 @@ public class ApiController {
         return orders.autoAssign(orderId);
     }
 
+    @PostMapping("/orders/{orderId}/refresh-eta")
+    public OrderService.OrderView refreshEta(@PathVariable Long orderId) {
+        return orders.refreshEta(orderId);
+    }
+
     // ---- error handling ----
 
     @ExceptionHandler(IllegalArgumentException.class)

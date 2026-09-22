@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.droppoint.core.AssignmentRanker;
+import com.droppoint.core.EtaCalculator;
 import com.droppoint.core.GeoPoint;
 import com.droppoint.repo.AppUser;
 import com.droppoint.repo.AppUser.AppUserRepository;
@@ -33,22 +34,26 @@ public class OrderService {
 
     public record OrderView(Long id, String orderNo, String customerName, String address,
                             int cylinderCount, String status, Long agentId, String agentName,
-                            String deliveryCode, Instant bookedAt) { }
+                            String deliveryCode, Instant bookedAt,
+                            Double travelMinutes, Double handoverMinutes, Double etaMinutes,
+                            Instant etaAt, String etaSource, String etaExplanation) { }
 
     private final DeliveryOrderRepository orders;
     private final CustomerRepository customers;
     private final AppUserRepository users;
     private final AttendanceRepository attendances;
     private final LocationPingRepository pings;
+    private final DistanceClient distances;
 
     public OrderService(DeliveryOrderRepository orders, CustomerRepository customers,
                         AppUserRepository users, AttendanceRepository attendances,
-                        LocationPingRepository pings) {
+                        LocationPingRepository pings, DistanceClient distances) {
         this.orders = orders;
         this.customers = customers;
         this.users = users;
         this.attendances = attendances;
         this.pings = pings;
+        this.distances = distances;
     }
 
     @Transactional
@@ -123,6 +128,7 @@ public class OrderService {
         order.assignTo(agentId, Instant.now());   // saved by dirty checking
 
         Customer customer = customers.findById(order.getCustomerId()).orElseThrow();
+        applyEta(order, customer, agentId);
         return toView(order, customer, agent.getFullName());
     }
 
@@ -149,9 +155,46 @@ public class OrderService {
         return out;
     }
 
+    @Transactional
+    public OrderView refreshEta(Long orderId) {
+        DeliveryOrder order = orders.findById(orderId)
+                .orElseThrow(() -> new NoSuchElementException("Order " + orderId + " not found"));
+        if (order.getAssignedAgentId() == null) {
+            throw new IllegalArgumentException("Order " + orderId + " has no agent assigned");
+        }
+        Customer customer = customers.findById(order.getCustomerId()).orElseThrow();
+        applyEta(order, customer, order.getAssignedAgentId());
+        String agentName = users.findById(order.getAssignedAgentId())
+                .map(AppUser::getFullName).orElse(null);
+        return toView(order, customer, agentName);
+    }
+
+    /** Works out the ETA from the agent's current position to the customer. */
+    private void applyEta(DeliveryOrder order, Customer customer, Long agentId) {
+        LocationPing last = pings.findTopByAgentIdOrderByRecordedAtDesc(agentId);
+        if (last == null) {
+            return;   // no position yet, no ETA
+        }
+        GeoPoint agentAt = new GeoPoint(last.getLatitude(), last.getLongitude());
+        GeoPoint destination = new GeoPoint(customer.getLatitude(), customer.getLongitude());
+
+        DistanceClient.Travel travel = distances.travelBetween(agentAt, destination);
+
+        EtaCalculator.Estimate estimate = EtaCalculator.estimate(travel.minutes(),
+                new EtaCalculator.DropContext(
+                        EtaCalculator.BuildingType.valueOf(customer.getBuildingType().name()),
+                        customer.getFloorNo(), customer.isHasLift(), order.getCylinderCount()));
+
+        order.setEta(estimate.travelMinutes(), estimate.handoverMinutes(), estimate.totalMinutes(),
+                Instant.now().plusSeconds(Math.round(estimate.totalMinutes() * 60)),
+                travel.source(), estimate.explanation());
+    }
+
     private static OrderView toView(DeliveryOrder o, Customer c, String agentName) {
         return new OrderView(o.getId(), o.getOrderNo(), c.getName(), c.getAddressLine(),
                 o.getCylinderCount(), o.getStatus().name(), o.getAssignedAgentId(), agentName,
-                o.getDeliveryCode(), o.getBookedAt());
+                o.getDeliveryCode(), o.getBookedAt(),
+                o.getTravelMinutes(), o.getHandoverMinutes(), o.getEtaMinutes(),
+                o.getEtaAt(), o.getEtaSource(), o.getEtaExplanation());
     }
 }

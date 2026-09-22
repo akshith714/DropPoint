@@ -49,6 +49,24 @@ public class DeliveryOrder {
     @Column(name = "delivery_code", nullable = false)
     private String deliveryCode;
 
+    @Column(name = "travel_minutes")
+    private Double travelMinutes;
+
+    @Column(name = "handover_minutes")
+    private Double handoverMinutes;
+
+    @Column(name = "eta_minutes")
+    private Double etaMinutes;
+
+    @Column(name = "eta_at")
+    private Instant etaAt;
+
+    @Column(name = "eta_source")
+    private String etaSource;
+
+    @Column(name = "eta_explanation")
+    private String etaExplanation;
+
     @Column(name = "booked_at", nullable = false)
     private Instant bookedAt;
 
@@ -80,6 +98,16 @@ public class DeliveryOrder {
         this.status = Status.ASSIGNED;
     }
 
+    public void setEta(double travelMinutes, double handoverMinutes, double totalMinutes,
+                       Instant etaAt, String source, String explanation) {
+        this.travelMinutes = travelMinutes;
+        this.handoverMinutes = handoverMinutes;
+        this.etaMinutes = totalMinutes;
+        this.etaAt = etaAt;
+        this.etaSource = source;
+        this.etaExplanation = explanation;
+    }
+
     public Long getId() { return id; }
     public String getOrderNo() { return orderNo; }
     public Long getCustomerId() { return customerId; }
@@ -91,6 +119,12 @@ public class DeliveryOrder {
     public String getDeliveryCode() { return deliveryCode; }
     public Instant getBookedAt() { return bookedAt; }
     public Instant getDeliveredAt() { return deliveredAt; }
+    public Double getTravelMinutes() { return travelMinutes; }
+    public Double getHandoverMinutes() { return handoverMinutes; }
+    public Double getEtaMinutes() { return etaMinutes; }
+    public Instant getEtaAt() { return etaAt; }
+    public String getEtaSource() { return etaSource; }
+    public String getEtaExplanation() { return etaExplanation; }
 
     public interface DeliveryOrderRepository extends JpaRepository<DeliveryOrder, Long> {
 
