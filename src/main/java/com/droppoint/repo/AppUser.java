@@ -1,5 +1,9 @@
 package com.droppoint.repo;
 
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -34,6 +38,10 @@ public class AppUser {
 
     @Column(nullable = false)
     private boolean active;
+
+    public interface AppUserRepository extends JpaRepository<AppUser, Long> {
+        Optional<AppUser> findByPhone(String phone);
+    }
 
     protected AppUser() {
         // required by JPA

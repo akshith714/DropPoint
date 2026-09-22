@@ -1,5 +1,7 @@
 package com.droppoint.repo;
 
+import org.springframework.data.jpa.repository.JpaRepository;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -26,6 +28,8 @@ public class Branch {
 
     @Column(name = "checkin_radius_m", nullable = false)
     private int checkinRadiusM;
+
+    public interface BranchRepository extends JpaRepository<Branch, Long> { }
 
     protected Branch() {
         // required by JPA

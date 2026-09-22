@@ -1,6 +1,9 @@
 package com.droppoint.repo;
 
 import java.time.Instant;
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -46,6 +49,10 @@ public class CheckinAttempt {
 
     @Column(nullable = false)
     private String reason;
+
+    public interface CheckinAttemptRepository extends JpaRepository<CheckinAttempt, Long> {
+        List<CheckinAttempt> findTop20ByAgentIdOrderByAttemptedAtDesc(Long agentId);
+    }
 
     protected CheckinAttempt() {
         // required by JPA

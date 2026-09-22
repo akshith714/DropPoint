@@ -32,7 +32,7 @@ public final class CheckInPolicy {
             throw new IllegalArgumentException("Accuracy must be zero or more, was " + accuracyMetres);
         }
 
-        double distance = GeoDistance.metresBetween(branch, agent);
+        double distance = branch.distanceTo(agent);
 
         if (mockLocation) {
             return new Result(false, Reason.MOCK_LOCATION, distance);

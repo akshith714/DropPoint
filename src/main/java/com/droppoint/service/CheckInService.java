@@ -12,13 +12,13 @@ import org.springframework.transaction.annotation.Transactional;
 import com.droppoint.core.CheckInPolicy;
 import com.droppoint.core.GeoPoint;
 import com.droppoint.repo.AppUser;
-import com.droppoint.repo.AppUserRepository;
+import com.droppoint.repo.AppUser.AppUserRepository;
 import com.droppoint.repo.Attendance;
-import com.droppoint.repo.AttendanceRepository;
+import com.droppoint.repo.Attendance.AttendanceRepository;
 import com.droppoint.repo.Branch;
-import com.droppoint.repo.BranchRepository;
+import com.droppoint.repo.Branch.BranchRepository;
 import com.droppoint.repo.CheckinAttempt;
-import com.droppoint.repo.CheckinAttemptRepository;
+import com.droppoint.repo.CheckinAttempt.CheckinAttemptRepository;
 
 @Service
 public class CheckInService {

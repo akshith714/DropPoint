@@ -2,6 +2,9 @@ package com.droppoint.repo;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -44,6 +47,10 @@ public class Attendance {
 
     @Column(name = "check_out_at")
     private Instant checkOutAt;
+
+    public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
+        Optional<Attendance> findByAgentIdAndWorkDate(Long agentId, LocalDate workDate);
+    }
 
     protected Attendance() {
         // required by JPA
