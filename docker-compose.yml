@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: droppoint-postgres
+    environment:
+      POSTGRES_DB: droppoint
+      POSTGRES_USER: droppoint
+      POSTGRES_PASSWORD: droppoint
+      TZ: Asia/Kolkata
+    ports:
+      - "5434:5432"
+    volumes:
+      - droppoint-data:/var/lib/postgresql/data
+
+volumes:
+  droppoint-data:
