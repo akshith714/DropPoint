@@ -1,5 +1,6 @@
 package com.droppoint.service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -29,6 +30,9 @@ public class CheckInService {
     public record CheckInResponse(boolean allowed, String status, String message,
                                   long distanceMetres, Long attendanceId, Instant checkInAt) { }
 
+    public record CheckOutResponse(String status, String message, Long attendanceId,
+                                   Instant checkInAt, Instant checkOutAt, long workedMinutes) { }
+
     private final AppUserRepository users;
     private final BranchRepository branches;
     private final AttendanceRepository attendances;
@@ -46,11 +50,7 @@ public class CheckInService {
     public CheckInResponse checkIn(Long agentId, double latitude, double longitude,
                                    double accuracyMetres, boolean mockLocation) {
 
-        AppUser agent = users.findById(agentId)
-                .orElseThrow(() -> new NoSuchElementException("Agent " + agentId + " not found"));
-        if (agent.getRole() != AppUser.Role.AGENT || !agent.isActive() || agent.getBranchId() == null) {
-            throw new IllegalArgumentException("User " + agentId + " is not an active agent with a branch");
-        }
+        AppUser agent = requireAgent(agentId);
         Branch branch = branches.findById(agent.getBranchId())
                 .orElseThrow(() -> new NoSuchElementException("Branch " + agent.getBranchId() + " not found"));
 
@@ -85,6 +85,41 @@ public class CheckInService {
 
         return new CheckInResponse(true, "CHECKED_IN", "Checked in. Have a safe day!",
                 distance, saved.getId(), saved.getCheckInAt());
+    }
+
+    @Transactional
+    public CheckOutResponse checkOut(Long agentId) {
+        AppUser agent = requireAgent(agentId);
+        Instant now = Instant.now();
+        LocalDate today = LocalDate.ofInstant(now, BUSINESS_ZONE);
+
+        Optional<Attendance> found = attendances.findByAgentIdAndWorkDate(agent.getId(), today);
+        if (found.isEmpty()) {
+            return new CheckOutResponse("NOT_CHECKED_IN", "You have not checked in today.",
+                    null, null, null, 0);
+        }
+
+        Attendance a = found.get();
+        if (a.getCheckOutAt() != null) {
+            return new CheckOutResponse("ALREADY_CHECKED_OUT", "You already checked out today.",
+                    a.getId(), a.getCheckInAt(), a.getCheckOutAt(),
+                    Duration.between(a.getCheckInAt(), a.getCheckOutAt()).toMinutes());
+        }
+
+        a.checkOut(now);   // saved automatically when the transaction ends (dirty checking)
+
+        return new CheckOutResponse("CHECKED_OUT", "Checked out. Thank you!",
+                a.getId(), a.getCheckInAt(), a.getCheckOutAt(),
+                Duration.between(a.getCheckInAt(), now).toMinutes());
+    }
+
+    private AppUser requireAgent(Long agentId) {
+        AppUser agent = users.findById(agentId)
+                .orElseThrow(() -> new NoSuchElementException("Agent " + agentId + " not found"));
+        if (agent.getRole() != AppUser.Role.AGENT || !agent.isActive() || agent.getBranchId() == null) {
+            throw new IllegalArgumentException("User " + agentId + " is not an active agent with a branch");
+        }
+        return agent;
     }
 
     private static String messageFor(CheckInPolicy.Reason reason, long distance, int radius) {

@@ -41,6 +41,11 @@ public class ApiController {
                 request.accuracyMetres(), request.mockLocation());
     }
 
+    @PostMapping("/agents/{agentId}/check-out")
+    public CheckInService.CheckOutResponse checkOut(@PathVariable Long agentId) {
+        return checkIns.checkOut(agentId);
+    }
+
     // ---- error handling ----
 
     @ExceptionHandler(IllegalArgumentException.class)
