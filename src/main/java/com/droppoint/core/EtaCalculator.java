@@ -69,8 +69,9 @@ public final class EtaCalculator {
 
     private static String explain(DropContext drop, double base, double floorPenalty, double cylinderExtra) {
         StringBuilder s = new StringBuilder();
-        s.append(round1(base)).append(" min at a ").append(drop.buildingType().name().toLowerCase())
-         .append(" address");
+        s.append(round1(base)).append(" min at ")
+         .append(drop.buildingType() == BuildingType.INDEPENDENT ? "an " : "a ")
+         .append(drop.buildingType().name().toLowerCase()).append(" address");
         if (floorPenalty > 0) {
             s.append(", +").append(round1(floorPenalty)).append(" min for floor ").append(drop.floorNo())
              .append(drop.hasLift() ? " with lift" : " with no lift");
