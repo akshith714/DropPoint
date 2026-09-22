@@ -12,10 +12,13 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.droppoint.core.AssignmentRanker;
 import com.droppoint.service.CheckInService;
+import com.droppoint.service.OrderService;
 import com.droppoint.service.TrackingService;
 
 @RestController
@@ -29,12 +32,16 @@ public class ApiController {
     public record SimulateRequest(double fromLat, double fromLon, double toLat, double toLon,
                                   Integer steps, Integer secondsPerStep) { }
 
+    public record CreateOrderRequest(Long customerId, Integer cylinderCount) { }
+
     private final CheckInService checkIns;
     private final TrackingService tracking;
+    private final OrderService orders;
 
-    public ApiController(CheckInService checkIns, TrackingService tracking) {
+    public ApiController(CheckInService checkIns, TrackingService tracking, OrderService orders) {
         this.checkIns = checkIns;
         this.tracking = tracking;
+        this.orders = orders;
     }
 
     // ---- endpoints ----
@@ -72,6 +79,31 @@ public class ApiController {
         int seconds = r.secondsPerStep() == null ? 5 : r.secondsPerStep();
         int created = tracking.simulateRoute(agentId, r.fromLat(), r.fromLon(), r.toLat(), r.toLon(), steps, seconds);
         return Map.of("pingsCreated", created);
+    }
+
+    @PostMapping("/orders")
+    public OrderService.OrderView createOrder(@RequestBody CreateOrderRequest r) {
+        return orders.create(r.customerId(), r.cylinderCount() == null ? 1 : r.cylinderCount());
+    }
+
+    @GetMapping("/orders")
+    public List<OrderService.OrderView> openOrders(@RequestParam(defaultValue = "1") Long branchId) {
+        return orders.openOrders(branchId);
+    }
+
+    @GetMapping("/orders/{orderId}/suggest-agents")
+    public List<AssignmentRanker.Ranked> suggestAgents(@PathVariable Long orderId) {
+        return orders.suggestAgents(orderId);
+    }
+
+    @PostMapping("/orders/{orderId}/assign/{agentId}")
+    public OrderService.OrderView assign(@PathVariable Long orderId, @PathVariable Long agentId) {
+        return orders.assign(orderId, agentId);
+    }
+
+    @PostMapping("/orders/{orderId}/auto-assign")
+    public OrderService.OrderView autoAssign(@PathVariable Long orderId) {
+        return orders.autoAssign(orderId);
     }
 
     // ---- error handling ----
