@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DropPoint — Live Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; display: flex; height: 100vh; }
+  #map { flex: 1; }
+  #side { width: 320px; padding: 16px; background: #f5f7f9; overflow-y: auto; border-left: 1px solid #d5dce3; }
+  h1 { font-size: 1.1rem; margin: 0 0 12px; }
+  .agent { background: #fff; border: 1px solid #d5dce3; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+  .agent b { display: block; }
+  .agent small { color: #4d5b69; }
+  .stale { opacity: 0.5; }
+  .susp { border-color: #b3261e; }
+  button { width: 100%; padding: 10px; margin-top: 8px; border: 0; border-radius: 8px;
+           background: #1f6e8c; color: #fff; font-size: 0.95rem; cursor: pointer; }
+  button:hover { background: #17566e; }
+  #status { font-size: 0.85rem; color: #4d5b69; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="side">
+  <h1>On duty now</h1>
+  <div id="agents"></div>
+  <button onclick="simulate()">Simulate Ravi's delivery run</button>
+  <div id="status"></div>
+</div>
+
+<script>
+const BRANCH = [17.3457, 78.5522];
+const CUSTOMER = [17.3689, 78.5247];
+
+const map = L.map('map').setView(BRANCH, 14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap', maxZoom: 19
+}).addTo(map);
+
+L.marker(BRANCH).addTo(map).bindPopup('L.B. Nagar Branch');
+
+const markers = {};
+
+async function refresh() {
+  try {
+    const res = await fetch('/api/tracking/live');
+    const agents = await res.json();
+    const list = document.getElementById('agents');
+
+    if (agents.length === 0) {
+      list.innerHTML = '<p style="color:#4d5b69">Nobody is checked in right now.</p>';
+    } else {
+      list.innerHTML = agents.map(a => `
+        <div class="agent ${a.secondsAgo > 120 ? 'stale' : ''} ${a.suspicious ? 'susp' : ''}">
+          <b>${a.agentName}</b>
+          <small>${a.speedKmph == null ? 'stationary' : a.speedKmph + ' km/h'}
+                 · updated ${a.secondsAgo}s ago
+                 ${a.suspicious ? ' · ⚠ impossible speed' : ''}</small>
+        </div>`).join('');
+    }
+
+    agents.forEach(a => {
+      const pos = [a.latitude, a.longitude];
+      if (markers[a.agentId]) {
+        markers[a.agentId].setLatLng(pos);
+      } else {
+        markers[a.agentId] = L.circleMarker(pos, {
+          radius: 9, color: '#1f6e8c', fillColor: '#1f6e8c', fillOpacity: 0.9
+        }).addTo(map).bindTooltip(a.agentName, { permanent: true, direction: 'top' });
+      }
+    });
+
+    document.getElementById('status').textContent =
+      'Last refresh: ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById('status').textContent = 'Cannot reach the server.';
+  }
+}
+
+async function simulate() {
+  const body = {
+    fromLat: BRANCH[0], fromLon: BRANCH[1],
+    toLat: CUSTOMER[0], toLon: CUSTOMER[1],
+    steps: 40, secondsPerStep: 5
+  };
+  const res = await fetch('/api/agents/3/simulate-route', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const out = await res.json();
+  document.getElementById('status').textContent =
+    res.ok ? out.pingsCreated + ' positions recorded.' : (out.error || 'Simulation failed.');
+  refresh();
+}
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

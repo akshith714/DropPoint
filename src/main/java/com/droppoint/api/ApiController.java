@@ -1,5 +1,6 @@
 package com.droppoint.api;
 
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.droppoint.service.CheckInService;
+import com.droppoint.service.TrackingService;
 
 @RestController
 @RequestMapping("/api")
@@ -22,10 +24,17 @@ public class ApiController {
 
     public record CheckInRequest(double latitude, double longitude, double accuracyMetres, boolean mockLocation) { }
 
-    private final CheckInService checkIns;
+    public record PingRequest(double latitude, double longitude, double accuracyMetres, boolean simulated) { }
 
-    public ApiController(CheckInService checkIns) {
+    public record SimulateRequest(double fromLat, double fromLon, double toLat, double toLon,
+                                  Integer steps, Integer secondsPerStep) { }
+
+    private final CheckInService checkIns;
+    private final TrackingService tracking;
+
+    public ApiController(CheckInService checkIns, TrackingService tracking) {
         this.checkIns = checkIns;
+        this.tracking = tracking;
     }
 
     // ---- endpoints ----
@@ -44,6 +53,25 @@ public class ApiController {
     @PostMapping("/agents/{agentId}/check-out")
     public CheckInService.CheckOutResponse checkOut(@PathVariable Long agentId) {
         return checkIns.checkOut(agentId);
+    }
+
+    @PostMapping("/agents/{agentId}/ping")
+    public TrackingService.PingResponse ping(@PathVariable Long agentId, @RequestBody PingRequest request) {
+        return tracking.recordPing(agentId, request.latitude(), request.longitude(),
+                request.accuracyMetres(), request.simulated());
+    }
+
+    @GetMapping("/tracking/live")
+    public List<TrackingService.LivePosition> live() {
+        return tracking.livePositions();
+    }
+
+    @PostMapping("/agents/{agentId}/simulate-route")
+    public Map<String, Object> simulate(@PathVariable Long agentId, @RequestBody SimulateRequest r) {
+        int steps = r.steps() == null ? 40 : r.steps();
+        int seconds = r.secondsPerStep() == null ? 5 : r.secondsPerStep();
+        int created = tracking.simulateRoute(agentId, r.fromLat(), r.fromLon(), r.toLat(), r.toLon(), steps, seconds);
+        return Map.of("pingsCreated", created);
     }
 
     // ---- error handling ----
