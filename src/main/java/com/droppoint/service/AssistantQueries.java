@@ -135,6 +135,54 @@ public class AssistantQueries {
                 """, minDaysQuiet);
     }
 
+    /** Everything the owner dashboard shows, in one call. */
+    public Map<String, Object> dashboard() {
+        Map<String, Object> today = todaySnapshot();
+
+        Map<String, Object> month = jdbc.queryForMap("""
+                SELECT count(*) AS deliveries,
+                       count(*) FILTER (WHERE late_minutes > 5) AS late,
+                       round(100.0 * count(*) FILTER (WHERE late_minutes <= 5) / greatest(count(*), 1), 0) AS on_time_pct,
+                       round(avg(late_minutes)::numeric, 1) AS avg_minutes_vs_eta,
+                       count(*) FILTER (WHERE verdict = 'SUSPICIOUS') AS flagged
+                  FROM delivery_proof
+                 WHERE recorded_at >= now() - INTERVAL '30 days'
+                """);
+
+        List<Map<String, Object>> agents = jdbc.queryForList("""
+                SELECT u.full_name AS agent,
+                       count(p.id) AS deliveries,
+                       count(*) FILTER (WHERE p.late_minutes > 5) AS late,
+                       round(avg(p.late_minutes)::numeric, 1) AS avg_vs_eta,
+                       (SELECT count(*) FROM attendance a
+                         WHERE a.agent_id = u.id
+                           AND a.work_date >= CURRENT_DATE - 30
+                           AND EXTRACT(HOUR FROM a.check_in_at AT TIME ZONE 'Asia/Kolkata') >= 9)
+                           AS late_checkins,
+                       EXISTS (SELECT 1 FROM attendance a
+                                WHERE a.agent_id = u.id AND a.work_date = CURRENT_DATE
+                                  AND a.check_out_at IS NULL) AS on_duty
+                  FROM app_user u
+                  LEFT JOIN delivery_proof p ON p.agent_id = u.id
+                       AND p.recorded_at >= now() - INTERVAL '30 days'
+                 WHERE u.role = 'AGENT'
+                 GROUP BY u.id, u.full_name
+                 ORDER BY late_checkins DESC, late DESC
+                """);
+
+        List<Map<String, Object>> lateByHour = jdbc.queryForList("""
+                SELECT EXTRACT(HOUR FROM recorded_at AT TIME ZONE 'Asia/Kolkata')::int AS hour,
+                       count(*) AS deliveries,
+                       count(*) FILTER (WHERE late_minutes > 5) AS late
+                  FROM delivery_proof
+                 WHERE recorded_at >= now() - INTERVAL '30 days'
+                 GROUP BY 1 HAVING count(*) >= 2 ORDER BY 1
+                """);
+
+        return Map.of("today", today, "month", month, "agents", agents,
+                "lateByHour", lateByHour, "atRisk", quietCustomers(30));
+    }
+
     /** Everything about one customer, matched loosely by name. */
     public Map<String, Object> customerHistory(String nameFragment) {
         List<Map<String, Object>> found = jdbc.queryForList("""

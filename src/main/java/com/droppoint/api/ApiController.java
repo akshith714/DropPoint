@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.droppoint.core.AssignmentRanker;
 import com.droppoint.repo.DeliveryProof;
+import com.droppoint.service.AssistantQueries;
 import com.droppoint.service.AssistantService;
 import com.droppoint.service.DeliveryService;
 import com.droppoint.service.CheckInService;
@@ -50,15 +51,18 @@ public class ApiController {
     private final DeliveryService deliveries;
     private final SeedService seed;
     private final AssistantService assistant;
+    private final AssistantQueries queries;
 
     public ApiController(CheckInService checkIns, TrackingService tracking, OrderService orders,
-                         DeliveryService deliveries, SeedService seed, AssistantService assistant) {
+                         DeliveryService deliveries, SeedService seed, AssistantService assistant,
+                         AssistantQueries queries) {
         this.checkIns = checkIns;
         this.tracking = tracking;
         this.orders = orders;
         this.deliveries = deliveries;
         this.seed = seed;
         this.assistant = assistant;
+        this.queries = queries;
     }
 
     // ---- endpoints ----
@@ -156,6 +160,11 @@ public class ApiController {
     @PostMapping("/assistant/ask")
     public AssistantService.Answer ask(@RequestBody AskRequest r) {
         return assistant.ask(r.question());
+    }
+
+    @GetMapping("/dashboard")
+    public Map<String, Object> dashboard() {
+        return queries.dashboard();
     }
 
     @PostMapping("/admin/seed/clear")

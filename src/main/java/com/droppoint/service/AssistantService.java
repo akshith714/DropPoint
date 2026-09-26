@@ -101,6 +101,7 @@ public class AssistantService {
                     String text = message.path("content").asText("")
                             .replace('\u00A0', ' ')      // non-breaking space
                             .replace('\u202F', ' ')      // narrow no-break space
+                            .replace('\u2011', '-')      // non-breaking hyphen
                             .replace('\u2014', '-')      // em dash
                             .replace('\u2013', '-')      // en dash
                             .replace('\u2019', '\'');    // curly apostrophe
