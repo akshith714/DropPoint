@@ -21,6 +21,7 @@ import com.droppoint.repo.DeliveryProof;
 import com.droppoint.service.AssistantQueries;
 import com.droppoint.service.AssistantService;
 import com.droppoint.service.DeliveryService;
+import com.droppoint.service.DemoService;
 import com.droppoint.service.CheckInService;
 import com.droppoint.service.OrderService;
 import com.droppoint.service.SeedService;
@@ -45,6 +46,9 @@ public class ApiController {
 
     public record AskRequest(String question) { }
 
+    public record DriveRequest(Long agentId, Double toLat, Double toLon,
+                               Integer steps, Integer secondsPerStep) { }
+
     private final CheckInService checkIns;
     private final TrackingService tracking;
     private final OrderService orders;
@@ -52,10 +56,11 @@ public class ApiController {
     private final SeedService seed;
     private final AssistantService assistant;
     private final AssistantQueries queries;
+    private final DemoService demo;
 
     public ApiController(CheckInService checkIns, TrackingService tracking, OrderService orders,
                          DeliveryService deliveries, SeedService seed, AssistantService assistant,
-                         AssistantQueries queries) {
+                         AssistantQueries queries, DemoService demo) {
         this.checkIns = checkIns;
         this.tracking = tracking;
         this.orders = orders;
@@ -63,6 +68,7 @@ public class ApiController {
         this.seed = seed;
         this.assistant = assistant;
         this.queries = queries;
+        this.demo = demo;
     }
 
     // ---- endpoints ----
@@ -165,6 +171,29 @@ public class ApiController {
     @GetMapping("/dashboard")
     public Map<String, Object> dashboard() {
         return queries.dashboard();
+    }
+
+    @PostMapping("/demo/reset")
+    public Map<String, Object> demoReset() {
+        return demo.reset();
+    }
+
+    @PostMapping("/demo/drive")
+    public Map<String, Object> demoDrive(@RequestBody DriveRequest r) {
+        if (demo.isDriving()) {
+            return Map.of("status", "already-driving");
+        }
+        demo.drive(r.agentId() == null ? 3L : r.agentId(),
+                   r.toLat() == null ? 17.3712 : r.toLat(),
+                   r.toLon() == null ? 78.5580 : r.toLon(),
+                   r.steps() == null ? 30 : r.steps(),
+                   r.secondsPerStep() == null ? 3 : r.secondsPerStep());
+        return Map.of("status", "driving");
+    }
+
+    @GetMapping("/demo/health")
+    public Map<String, Object> demoHealth() {
+        return demo.healthCheck();
     }
 
     @PostMapping("/admin/seed/clear")
