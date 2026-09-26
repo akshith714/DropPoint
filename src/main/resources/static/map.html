@@ -27,7 +27,7 @@
 <div id="side">
   <h1>On duty now</h1>
   <div id="agents"></div>
-  <button onclick="drive()">Drive Ravi to the customer (live)</button>
+  <button onclick="drive()">Drive Suresh to the customer (live)</button>
   <div id="status"></div>
 </div>
 
@@ -84,11 +84,11 @@ async function drive() {
   const res = await fetch('/api/demo/drive', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ agentId: 3, toLat: 17.3712, toLon: 78.5580, steps: 30, secondsPerStep: 3 })
+    body: JSON.stringify({ agentId: 4, toLat: 17.3712, toLon: 78.5580, steps: 30, secondsPerStep: 3 })
   });
   const out = await res.json();
   document.getElementById('status').textContent =
-    out.status === 'driving' ? 'Ravi is on the move - watch the map.' : 'A drive is already running.';
+    out.status === 'driving' ? 'Suresh is on the move - watch the map.' : 'A drive is already running.';
 }
 
 refresh();

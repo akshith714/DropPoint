@@ -1,5 +1,10 @@
 # DropPoint — 5 minute demo script
 
+**Never paste more than one block at a time.** PowerShell evaluates variables when a
+block is parsed, not when each line runs. Note also that Windows PowerShell 5.1 does
+not enumerate an `Invoke-RestMethod` list when you pipe it inline - assign it to a
+variable first, as blocks A and E do, or the pipe yields one empty row.
+
 ## Before they arrive
 
 1. Docker running: `docker ps` shows `droppoint-postgres`
@@ -34,9 +39,12 @@ Invoke-RestMethod -Method Post -Uri http://localhost:8081/api/agents/3/check-in 
 "Accepted. And every attempt is logged, including the refused one."
 
 ### 3. Assignment and ETA (60 s) — tab: order board
-Click **Auto-assign** on the waiting order.
+Click **Auto-assign** on the DEMO- order (Priya Sharma).
 "It didn't just pick the nearest agent — it weighed distance against how many
 orders each already has."
+
+Note who it assigned: that agent does the drive and the delivery. It should be
+Suresh, who is carrying fewer orders than Ravi.
 
 Point at the ETA: "Google would tell us the drive takes X minutes. This says
 X plus 15 — because Priya is on the 5th floor of a gated building and there are
@@ -44,23 +52,49 @@ two cylinders to carry. That's the time that actually makes deliveries late,
 and no maps API knows it."
 
 ### 4. Live tracking (60 s) — tab: map
-Click **Drive Ravi to the customer**. Talk while it moves.
+Click **Drive Suresh to the customer**. Talk while it moves.
 "Position every 30 seconds, only between check-in and check-out — we don't
 track anyone off duty. Speed is calculated here; anything above 150 km/h
 gets flagged as impossible."
 
-### 5. Delivery proof (45 s)
-"The customer reads out a 4-digit code."
+### 5. Delivery proof (60 s)
+"The customer reads out a 4-digit code." One block at a time.
+
+**A — pick up the order and the agent it went to**
 ```powershell
-# wrong code
-$d = @{ agentId = 3; latitude = 17.3712; longitude = 78.5580; code = "0000" } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "http://localhost:8081/api/orders/ORDER_ID/deliver" -ContentType "application/json" -Body $d | Format-List
-# correct code
-$d = @{ agentId = 3; latitude = 17.3712; longitude = 78.5580; code = "4747" } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "http://localhost:8081/api/orders/ORDER_ID/deliver" -ContentType "application/json" -Body $d | Format-List
+$all = Invoke-RestMethod http://localhost:8081/api/orders
+$o = $all | Where-Object { $_.orderNo -like 'DEMO-*' } | Select-Object -First 1
+$id = $o.id; $agent = $o.agentId
+"order $id, assigned to $($o.agentName) (agent $agent), code $($o.deliveryCode)"
 ```
-"Wrong code blocks it. Right code at the right place verifies it. Right code
-3 km away would still record the delivery — but flag it for the manager."
+
+**B — wrong code, right place**
+```powershell
+$b = @{ agentId = $agent; latitude = 17.3712; longitude = 78.5580; code = "0000" } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri "http://localhost:8081/api/orders/$id/deliver" -ContentType "application/json" -Body $b | Format-List
+```
+"Blocked - WRONG_CODE. The order is still open, so he can try again."
+
+**C — correct code, right place**
+```powershell
+$b = @{ agentId = $agent; latitude = 17.3712; longitude = 78.5580; code = $o.deliveryCode } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri "http://localhost:8081/api/orders/$id/deliver" -ContentType "application/json" -Body $b | Format-List
+```
+"VERIFIED, a few metres from her door. Beyond 150 m it still records the delivery -
+the agent gets paid - but the manager sees it."
+
+**D — the owner's numbers move on their own**
+```powershell
+(Invoke-RestMethod http://localhost:8081/api/dashboard).today | Format-List
+```
+"delivered_today just went up. Nobody typed that in anywhere."
+
+**E — what the manager reviews**
+```powershell
+$flagged = Invoke-RestMethod http://localhost:8081/api/deliveries/suspicious
+$flagged | Select-Object -First 3 orderId, agentId, @{n='metresAway';e={[math]::Round($_.distanceM)}}, verdict, lateMinutes | Format-Table
+```
+"Right code, but 2 to 3 km from the address. That is the case worth a phone call."
 
 ### 6. The AI (75 s) — tab: dashboard
 Click **Who was late most this month?**
@@ -81,6 +115,7 @@ route planning across multiple stops, WhatsApp booking, and stock settlement."
 ## If something breaks
 - Assistant errors → GROQ_API_KEY not set in this terminal
 - Map empty → nobody checked in today, run the reset
-- Drive does nothing → agent 3 must be checked in first (step 2)
+- Drive does nothing → the driving agent must be on duty; the reset puts Suresh on duty
+- Delivery says NOT_ASSIGNED_AGENT → block A picked the wrong order, or auto-assign chose Ravi; use the agent id block A printed
 - Port 8081 busy → `Get-NetTCPConnection -LocalPort 8081 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }`
 - Anything unexplained → reset and carry on; never debug live
