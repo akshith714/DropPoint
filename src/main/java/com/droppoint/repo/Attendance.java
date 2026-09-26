@@ -2,6 +2,7 @@ package com.droppoint.repo;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -50,6 +51,8 @@ public class Attendance {
 
     public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
         Optional<Attendance> findByAgentIdAndWorkDate(Long agentId, LocalDate workDate);
+
+        List<Attendance> findByWorkDateBefore(LocalDate date);
     }
 
     protected Attendance() {

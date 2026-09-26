@@ -17,8 +17,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.droppoint.core.AssignmentRanker;
+import com.droppoint.repo.DeliveryProof;
+import com.droppoint.service.AssistantService;
+import com.droppoint.service.DeliveryService;
 import com.droppoint.service.CheckInService;
 import com.droppoint.service.OrderService;
+import com.droppoint.service.SeedService;
 import com.droppoint.service.TrackingService;
 
 @RestController
@@ -34,14 +38,27 @@ public class ApiController {
 
     public record CreateOrderRequest(Long customerId, Integer cylinderCount) { }
 
+    public record DeliverRequest(Long agentId, double latitude, double longitude, String code) { }
+
+    public record FailRequest(Long agentId, String reason) { }
+
+    public record AskRequest(String question) { }
+
     private final CheckInService checkIns;
     private final TrackingService tracking;
     private final OrderService orders;
+    private final DeliveryService deliveries;
+    private final SeedService seed;
+    private final AssistantService assistant;
 
-    public ApiController(CheckInService checkIns, TrackingService tracking, OrderService orders) {
+    public ApiController(CheckInService checkIns, TrackingService tracking, OrderService orders,
+                         DeliveryService deliveries, SeedService seed, AssistantService assistant) {
         this.checkIns = checkIns;
         this.tracking = tracking;
         this.orders = orders;
+        this.deliveries = deliveries;
+        this.seed = seed;
+        this.assistant = assistant;
     }
 
     // ---- endpoints ----
@@ -111,6 +128,42 @@ public class ApiController {
         return orders.refreshEta(orderId);
     }
 
+    @PostMapping("/orders/{orderId}/deliver")
+    public DeliveryService.DeliveryResult deliver(@PathVariable Long orderId, @RequestBody DeliverRequest r) {
+        return deliveries.deliver(orderId, r.agentId(), r.latitude(), r.longitude(), r.code());
+    }
+
+    @PostMapping("/orders/{orderId}/fail")
+    public DeliveryService.DeliveryResult fail(@PathVariable Long orderId, @RequestBody FailRequest r) {
+        return deliveries.fail(orderId, r.agentId(), r.reason());
+    }
+
+    @GetMapping("/agents/{agentId}/orders")
+    public List<DeliveryService.AgentOrderView> myOrders(@PathVariable Long agentId) {
+        return deliveries.myOrders(agentId);
+    }
+
+    @GetMapping("/deliveries/suspicious")
+    public List<DeliveryProof> suspicious() {
+        return deliveries.suspiciousDeliveries();
+    }
+
+    @PostMapping("/admin/seed")
+    public SeedService.SeedSummary seed(@RequestParam(defaultValue = "false") boolean force) {
+        return seed.generate(force);
+    }
+
+    @PostMapping("/assistant/ask")
+    public AssistantService.Answer ask(@RequestBody AskRequest r) {
+        return assistant.ask(r.question());
+    }
+
+    @PostMapping("/admin/seed/clear")
+    public Map<String, String> clearSeed() {
+        seed.clear();
+        return Map.of("status", "cleared");
+    }
+
     // ---- error handling ----
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -122,6 +175,12 @@ public class ApiController {
     @ExceptionHandler(NoSuchElementException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public Map<String, String> notFound(NoSuchElementException e) {
+        return Map.of("error", String.valueOf(e.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public Map<String, String> conflictingState(IllegalStateException e) {
         return Map.of("error", String.valueOf(e.getMessage()));
     }
 

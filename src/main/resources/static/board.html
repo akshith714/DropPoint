@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DropPoint — Order Board</title>
+<style>
+  :root { --ink:#1c2733; --soft:#4d5b69; --rule:#d5dce3; --blue:#1f6e8c; --green:#1e6b47; --red:#b3261e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:#f5f7f9; color:var(--ink); }
+  header { background:#fff; border-bottom:1px solid var(--rule); padding:14px 20px;
+           display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  h1 { font-size:1.15rem; margin:0; }
+  .stat { font-size:0.9rem; color:var(--soft); }
+  .stat b { color:var(--ink); font-size:1.1rem; display:block; }
+  main { padding:20px; }
+  table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--rule); border-radius:8px; }
+  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--rule); font-size:0.92rem; }
+  th { background:#edf1f5; font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  .pill { display:inline-block; padding:2px 9px; border-radius:99px; font-size:0.8rem; font-weight:600; }
+  .BOOKED { background:#fbf0d4; color:#9a6a00; }
+  .ASSIGNED { background:#ddeef4; color:var(--blue); }
+  .DELIVERED { background:#dcefe5; color:var(--green); }
+  .FAILED { background:#f6e3e1; color:var(--red); }
+  button { padding:5px 11px; border:0; border-radius:6px; background:var(--blue); color:#fff;
+           font-size:0.85rem; cursor:pointer; }
+  button:hover { background:#17566e; }
+  .late { color:var(--red); font-weight:600; }
+  .early { color:var(--green); }
+  #msg { margin-top:12px; color:var(--soft); font-size:0.9rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Order board — L.B. Nagar</h1>
+  <div class="stat">Open <b id="open">–</b></div>
+  <div class="stat">Delivered today <b id="done">–</b></div>
+  <div class="stat">Flagged <b id="flag">–</b></div>
+  <div style="margin-left:auto"><a href="/assistant.html">Ask →</a> &nbsp; <a href="/map.html">Live map →</a></div>
+</header>
+
+<main>
+  <table>
+    <thead>
+      <tr><th>Order</th><th>Customer</th><th>Address</th><th>Cyl</th>
+          <th>Status</th><th>Agent</th><th>ETA</th><th></th></tr>
+    </thead>
+    <tbody id="rows"><tr><td colspan="8">Loading…</td></tr></tbody>
+  </table>
+  <div id="msg"></div>
+</main>
+
+<script>
+async function refresh() {
+  try {
+    const [orders, flagged] = await Promise.all([
+      fetch('/api/orders').then(r => r.json()),
+      fetch('/api/deliveries/suspicious').then(r => r.json())
+    ]);
+
+    document.getElementById('open').textContent = orders.length;
+    document.getElementById('flag').textContent = flagged.length;
+
+    const rows = document.getElementById('rows');
+    if (orders.length === 0) {
+      rows.innerHTML = '<tr><td colspan="8">No open orders.</td></tr>';
+    } else {
+      rows.innerHTML = orders.map(o => `
+        <tr>
+          <td><code>${o.orderNo}</code></td>
+          <td>${o.customerName}</td>
+          <td>${o.address}</td>
+          <td>${o.cylinderCount}</td>
+          <td><span class="pill ${o.status}">${o.status}</span></td>
+          <td>${o.agentName ?? '—'}</td>
+          <td title="${o.etaExplanation ?? ''}">
+            ${o.etaMinutes == null ? '—' : o.etaMinutes + ' min' +
+              (o.handoverMinutes ? ` <small style="color:#4d5b69">(${o.travelMinutes} drive + ${o.handoverMinutes} door)</small>` : '')}
+          </td>
+          <td>${o.status === 'BOOKED'
+                ? `<button onclick="assign(${o.id})">Auto-assign</button>` : ''}</td>
+        </tr>`).join('');
+    }
+  } catch (e) {
+    document.getElementById('msg').textContent = 'Cannot reach the server.';
+  }
+}
+
+async function assign(orderId) {
+  const res = await fetch(`/api/orders/${orderId}/auto-assign`, { method: 'POST' });
+  const out = await res.json();
+  document.getElementById('msg').textContent = res.ok
+    ? `Assigned to ${out.agentName} — ETA ${out.etaMinutes} min (${out.etaExplanation})`
+    : (out.error || 'Assignment failed.');
+  refresh();
+}
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

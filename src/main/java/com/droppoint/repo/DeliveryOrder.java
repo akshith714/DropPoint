@@ -73,6 +73,12 @@ public class DeliveryOrder {
     @Column(name = "delivered_at")
     private Instant deliveredAt;
 
+    @Column(name = "failure_reason")
+    private String failureReason;
+
+    @Column(nullable = false)
+    private boolean seeded;
+
     protected DeliveryOrder() {
         // required by JPA
     }
@@ -96,6 +102,28 @@ public class DeliveryOrder {
         this.assignedAgentId = agentId;
         this.assignedAt = at;
         this.status = Status.ASSIGNED;
+    }
+
+    /** Marks this order as generated demo data, so the seed can be cleared again. */
+    public void markSeeded() {
+        this.seeded = true;
+    }
+
+    public void markDelivered(Instant at) {
+        if (status != Status.ASSIGNED) {
+            throw new IllegalStateException("Order " + orderNo + " is " + status + " and cannot be delivered");
+        }
+        this.status = Status.DELIVERED;
+        this.deliveredAt = at;
+    }
+
+    public void markFailed(String reason, Instant at) {
+        if (status != Status.ASSIGNED) {
+            throw new IllegalStateException("Order " + orderNo + " is " + status + " and cannot be failed");
+        }
+        this.status = Status.FAILED;
+        this.failureReason = reason;
+        this.deliveredAt = at;
     }
 
     public void setEta(double travelMinutes, double handoverMinutes, double totalMinutes,
@@ -125,6 +153,8 @@ public class DeliveryOrder {
     public Instant getEtaAt() { return etaAt; }
     public String getEtaSource() { return etaSource; }
     public String getEtaExplanation() { return etaExplanation; }
+    public String getFailureReason() { return failureReason; }
+    public boolean isSeeded() { return seeded; }
 
     public interface DeliveryOrderRepository extends JpaRepository<DeliveryOrder, Long> {
 
@@ -133,5 +163,9 @@ public class DeliveryOrder {
         long countByAssignedAgentIdAndStatus(Long agentId, Status status);
 
         List<DeliveryOrder> findByAssignedAgentIdAndStatusOrderByAssignedAtAsc(Long agentId, Status status);
+
+        List<DeliveryOrder> findByBranchIdAndDeliveredAtAfterOrderByDeliveredAtDesc(Long branchId, Instant after);
+
+        List<DeliveryOrder> findBySeededTrue();
     }
 }

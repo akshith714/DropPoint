@@ -59,8 +59,29 @@ public class Customer {
     @Column(nullable = false)
     private boolean active;
 
+    @Column(nullable = false)
+    private boolean seeded;
+
     protected Customer() {
         // required by JPA
+    }
+
+    public Customer(Long branchId, String name, String phone, CustomerType customerType,
+                    String addressLine, double latitude, double longitude,
+                    BuildingType buildingType, short floorNo, boolean hasLift,
+                    boolean active, boolean seeded) {
+        this.branchId = branchId;
+        this.name = name;
+        this.phone = phone;
+        this.customerType = customerType;
+        this.addressLine = addressLine;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.buildingType = buildingType;
+        this.floorNo = floorNo;
+        this.hasLift = hasLift;
+        this.active = active;
+        this.seeded = seeded;
     }
 
     public Long getId() { return id; }
@@ -75,8 +96,11 @@ public class Customer {
     public short getFloorNo() { return floorNo; }
     public boolean isHasLift() { return hasLift; }
     public boolean isActive() { return active; }
+    public boolean isSeeded() { return seeded; }
 
     public interface CustomerRepository extends JpaRepository<Customer, Long> {
         List<Customer> findByBranchIdAndActiveTrue(Long branchId);
+
+        List<Customer> findBySeededTrue();
     }
 }
