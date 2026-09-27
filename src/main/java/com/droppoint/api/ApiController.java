@@ -16,16 +16,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.droppoint.core.AssignmentRanker;
-import com.droppoint.repo.DeliveryProof;
-import com.droppoint.service.AssistantQueries;
+import com.droppoint.core.Rules.AssignmentRanker;
+import com.droppoint.repo.Deliveries.DeliveryProof;
 import com.droppoint.service.AssistantService;
-import com.droppoint.service.DeliveryService;
 import com.droppoint.service.DemoService;
-import com.droppoint.service.CheckInService;
+import com.droppoint.service.AgentService;
 import com.droppoint.service.OrderService;
-import com.droppoint.service.SeedService;
-import com.droppoint.service.TrackingService;
 
 @RestController
 @RequestMapping("/api")
@@ -49,25 +45,17 @@ public class ApiController {
     public record DriveRequest(Long agentId, Double toLat, Double toLon,
                                Integer steps, Integer secondsPerStep) { }
 
-    private final CheckInService checkIns;
-    private final TrackingService tracking;
+    private final AgentService agents;
     private final OrderService orders;
-    private final DeliveryService deliveries;
-    private final SeedService seed;
     private final AssistantService assistant;
-    private final AssistantQueries queries;
     private final DemoService demo;
 
-    public ApiController(CheckInService checkIns, TrackingService tracking, OrderService orders,
-                         DeliveryService deliveries, SeedService seed, AssistantService assistant,
-                         AssistantQueries queries, DemoService demo) {
-        this.checkIns = checkIns;
-        this.tracking = tracking;
+    public ApiController(AgentService agents, OrderService orders,
+                         AssistantService assistant,
+                         DemoService demo) {
+        this.agents = agents;
         this.orders = orders;
-        this.deliveries = deliveries;
-        this.seed = seed;
         this.assistant = assistant;
-        this.queries = queries;
         this.demo = demo;
     }
 
@@ -79,32 +67,32 @@ public class ApiController {
     }
 
     @PostMapping("/agents/{agentId}/check-in")
-    public CheckInService.CheckInResponse checkIn(@PathVariable Long agentId, @RequestBody CheckInRequest request) {
-        return checkIns.checkIn(agentId, request.latitude(), request.longitude(),
+    public AgentService.CheckInResponse checkIn(@PathVariable Long agentId, @RequestBody CheckInRequest request) {
+        return agents.checkIn(agentId, request.latitude(), request.longitude(),
                 request.accuracyMetres(), request.mockLocation());
     }
 
     @PostMapping("/agents/{agentId}/check-out")
-    public CheckInService.CheckOutResponse checkOut(@PathVariable Long agentId) {
-        return checkIns.checkOut(agentId);
+    public AgentService.CheckOutResponse checkOut(@PathVariable Long agentId) {
+        return agents.checkOut(agentId);
     }
 
     @PostMapping("/agents/{agentId}/ping")
-    public TrackingService.PingResponse ping(@PathVariable Long agentId, @RequestBody PingRequest request) {
-        return tracking.recordPing(agentId, request.latitude(), request.longitude(),
+    public AgentService.PingResponse ping(@PathVariable Long agentId, @RequestBody PingRequest request) {
+        return agents.recordPing(agentId, request.latitude(), request.longitude(),
                 request.accuracyMetres(), request.simulated());
     }
 
     @GetMapping("/tracking/live")
-    public List<TrackingService.LivePosition> live() {
-        return tracking.livePositions();
+    public List<AgentService.LivePosition> live() {
+        return agents.livePositions();
     }
 
     @PostMapping("/agents/{agentId}/simulate-route")
     public Map<String, Object> simulate(@PathVariable Long agentId, @RequestBody SimulateRequest r) {
         int steps = r.steps() == null ? 40 : r.steps();
         int seconds = r.secondsPerStep() == null ? 5 : r.secondsPerStep();
-        int created = tracking.simulateRoute(agentId, r.fromLat(), r.fromLon(), r.toLat(), r.toLon(), steps, seconds);
+        int created = agents.simulateRoute(agentId, r.fromLat(), r.fromLon(), r.toLat(), r.toLon(), steps, seconds);
         return Map.of("pingsCreated", created);
     }
 
@@ -139,28 +127,28 @@ public class ApiController {
     }
 
     @PostMapping("/orders/{orderId}/deliver")
-    public DeliveryService.DeliveryResult deliver(@PathVariable Long orderId, @RequestBody DeliverRequest r) {
-        return deliveries.deliver(orderId, r.agentId(), r.latitude(), r.longitude(), r.code());
+    public OrderService.DeliveryResult deliver(@PathVariable Long orderId, @RequestBody DeliverRequest r) {
+        return orders.deliver(orderId, r.agentId(), r.latitude(), r.longitude(), r.code());
     }
 
     @PostMapping("/orders/{orderId}/fail")
-    public DeliveryService.DeliveryResult fail(@PathVariable Long orderId, @RequestBody FailRequest r) {
-        return deliveries.fail(orderId, r.agentId(), r.reason());
+    public OrderService.DeliveryResult fail(@PathVariable Long orderId, @RequestBody FailRequest r) {
+        return orders.fail(orderId, r.agentId(), r.reason());
     }
 
     @GetMapping("/agents/{agentId}/orders")
-    public List<DeliveryService.AgentOrderView> myOrders(@PathVariable Long agentId) {
-        return deliveries.myOrders(agentId);
+    public List<OrderService.AgentOrderView> myOrders(@PathVariable Long agentId) {
+        return orders.myOrders(agentId);
     }
 
     @GetMapping("/deliveries/suspicious")
     public List<DeliveryProof> suspicious() {
-        return deliveries.suspiciousDeliveries();
+        return orders.suspiciousDeliveries();
     }
 
     @PostMapping("/admin/seed")
-    public SeedService.SeedSummary seed(@RequestParam(defaultValue = "false") boolean force) {
-        return seed.generate(force);
+    public DemoService.SeedSummary seed(@RequestParam(defaultValue = "false") boolean force) {
+        return demo.generate(force);
     }
 
     @PostMapping("/assistant/ask")
@@ -170,7 +158,7 @@ public class ApiController {
 
     @GetMapping("/dashboard")
     public Map<String, Object> dashboard() {
-        return queries.dashboard();
+        return assistant.dashboard();
     }
 
     @PostMapping("/demo/reset")
@@ -198,7 +186,7 @@ public class ApiController {
 
     @PostMapping("/admin/seed/clear")
     public Map<String, String> clearSeed() {
-        seed.clear();
+        demo.clear();
         return Map.of("status", "cleared");
     }
 
