@@ -15,12 +15,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,8 +37,7 @@ import com.droppoint.repo.Deliveries.DeliveryProof.DeliveryProofRepository;
 
 /**
  * Everything that exists to make the system demonstrable: the seeded operating
- * history, the reset that puts the app into a known state before a demo, and the
- * live drive that moves an agent along a route so tracking can be shown indoors.
+ * history and the reset that puts the app into a known state before a demo.
  *
  * The seeded patterns are planted on purpose: a habitually late agent, deliveries
  * that run late in the evening and at gated addresses, and five churn stories.
@@ -101,7 +98,6 @@ public class DemoService {
     private final AppUserRepository users;
     private final JdbcTemplate jdbc;
     private final AgentService agents;
-    private final AtomicBoolean driving = new AtomicBoolean(false);
 
     public DemoService(CustomerRepository customers, DeliveryOrderRepository orders,
                        AttendanceRepository attendances, DeliveryProofRepository proofs,
@@ -518,46 +514,6 @@ public class DemoService {
                 "checkInLive", "Ravi Kumar (agent 3) is NOT checked in - do it on stage",
                 "waitingOrderId", orderId,
                 "waitingCustomer", "Priya Sharma, gated, floor 5, 2 cylinders");
-    }
-
-    /**
-     * Drives an agent from the branch to a customer in real time, one ping every
-     * few seconds, so the map visibly moves. Runs in the background.
-     */
-    @Async
-    public void drive(Long agentId, double toLat, double toLon, int steps, int secondsPerStep) {
-        if (!driving.compareAndSet(false, true)) {
-            log.warn("A drive is already running");
-            return;
-        }
-        try {
-            GeoPoint from = new GeoPoint(BRANCH_LAT, BRANCH_LON);
-            GeoPoint to = new GeoPoint(toLat, toLon);
-            log.info("Driving agent {} over {} steps, {} m to cover",
-                    agentId, steps, Math.round(from.distanceTo(to)));
-
-            for (int i = 0; i < steps; i++) {
-                double f = i / (double) (steps - 1);
-                // a slight curve so it does not look like a ruler line
-                double wobble = Math.sin(f * Math.PI) * 0.0012;
-                double lat = BRANCH_LAT + (toLat - BRANCH_LAT) * f + wobble;
-                double lon = BRANCH_LON + (toLon - BRANCH_LON) * f;
-
-                agents.recordPing(agentId, lat, lon, 9, true);
-                Thread.sleep(secondsPerStep * 1000L);
-            }
-            log.info("Drive finished for agent {}", agentId);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (Exception e) {
-            log.error("Drive failed", e);
-        } finally {
-            driving.set(false);
-        }
-    }
-
-    public boolean isDriving() {
-        return driving.get();
     }
 
     /** Quick check that everything the demo needs is working. */

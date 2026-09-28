@@ -307,20 +307,6 @@ public final class Workforce {
             LocationPing findTopByAgentIdOrderByRecordedAtDesc(Long agentId);
 
             List<LocationPing> findByAgentIdAndRecordedAtAfterOrderByRecordedAtAsc(Long agentId, Instant after);
-
-            /** Latest ping per agent, for agents on duty today (checked in, not checked out). */
-            @Query(value = """
-                    SELECT DISTINCT ON (p.agent_id)
-                           p.agent_id, u.full_name, p.latitude, p.longitude,
-                           p.recorded_at, p.speed_kmph, p.suspicious
-                    FROM location_ping p
-                    JOIN app_user u ON u.id = p.agent_id
-                    JOIN attendance a ON a.agent_id = p.agent_id
-                                     AND a.work_date = CURRENT_DATE
-                                     AND a.check_out_at IS NULL
-                    ORDER BY p.agent_id, p.recorded_at DESC
-                    """, nativeQuery = true)
-            List<Object[]> findLivePositions();
         }
     }
 }

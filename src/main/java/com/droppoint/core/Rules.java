@@ -2,7 +2,10 @@ package com.droppoint.core;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * The business rules, one nested class each. They hold no state beyond their
@@ -59,69 +62,6 @@ public final class Rules {
                 return new Result(false, Reason.TOO_FAR, distance);
             }
             return new Result(true, Reason.ALLOWED, distance);
-        }
-    }
-
-    /**
-     * Ranks available agents for one delivery.
-     * Score = distance in km + (active orders x workload weight). Lower is better.
-     */
-    public static final class AssignmentRanker {
-
-        /** An agent who could take the delivery. */
-        public record Candidate(Long agentId, String agentName, GeoPoint position, int activeOrders) { }
-
-        /** One agent's score for this delivery. */
-        public record Ranked(Long agentId, String agentName, double distanceKm, int activeOrders,
-                             double score, String explanation) { }
-
-        private final double workloadWeightKm;
-        private final int maxOrdersPerAgent;
-
-        public AssignmentRanker(double workloadWeightKm, int maxOrdersPerAgent) {
-            if (!(workloadWeightKm >= 0)) {
-                throw new IllegalArgumentException("Workload weight must be zero or more, was " + workloadWeightKm);
-            }
-            if (maxOrdersPerAgent < 1) {
-                throw new IllegalArgumentException("Max orders must be at least 1, was " + maxOrdersPerAgent);
-            }
-            this.workloadWeightKm = workloadWeightKm;
-            this.maxOrdersPerAgent = maxOrdersPerAgent;
-        }
-
-        /** Best first. Agents at their order limit are left out. */
-        public List<Ranked> rank(GeoPoint destination, List<Candidate> candidates) {
-            if (destination == null) {
-                throw new IllegalArgumentException("Destination is required");
-            }
-            if (candidates == null) {
-                throw new IllegalArgumentException("Candidates are required");
-            }
-
-            List<Ranked> ranked = new ArrayList<>();
-            for (Candidate c : candidates) {
-                if (c.position() == null) {
-                    throw new IllegalArgumentException("Candidate " + c.agentId() + " has no position");
-                }
-                if (c.activeOrders() < 0) {
-                    throw new IllegalArgumentException("Candidate " + c.agentId() + " has negative orders");
-                }
-                if (c.activeOrders() >= maxOrdersPerAgent) {
-                    continue;   // already full
-                }
-
-                double distanceKm = round1(destination.distanceTo(c.position()) / 1000.0);
-                double score = round1(distanceKm + c.activeOrders() * workloadWeightKm);
-                String explanation = distanceKm + " km away, " + c.activeOrders() + " active order"
-                        + (c.activeOrders() == 1 ? "" : "s");
-
-                ranked.add(new Ranked(c.agentId(), c.agentName(), distanceKm, c.activeOrders(), score, explanation));
-            }
-
-            ranked.sort(Comparator.comparingDouble(Ranked::score)
-                    .thenComparingDouble(Ranked::distanceKm)
-                    .thenComparing(Ranked::agentId));
-            return ranked;
         }
     }
 
@@ -265,6 +205,144 @@ public final class Rules {
             }
 
             return new Result(true, null, Verdict.VERIFIED, distance, "Delivery verified.");
+        }
+    }
+
+    /**
+     * Splits a day's areas across the agents who are available, respecting each
+     * agent's daily cap. No distance and no coordinates: an agent covers whole
+     * areas. Whoever covered an area most recently keeps it when they have room.
+     */
+    public static final class DayPlan {
+
+        /** All the orders waiting in one area today. */
+        public record AreaLoad(Long areaId, String areaName, int orders, int cylinders) { }
+
+        /** An agent who is in today, and how many more stops they can take. */
+        public record AgentSlot(Long agentId, String agentName, int capacity, Long lastCoveredAreaId) { }
+
+        /** One agent taking some or all of one area. */
+        public record Assignment(Long agentId, String agentName, Long areaId, String areaName,
+                                 int orders, boolean partial) { }
+
+        /** Orders that nobody could take today. */
+        public record Leftover(Long areaId, String areaName, int orders, String reason) { }
+
+        public record Result(List<Assignment> assignments, List<Leftover> leftovers,
+                             List<String> notes, int totalCapacity, int totalOrders) { }
+
+        private DayPlan() { }
+
+        public static Result plan(List<AreaLoad> areas, List<AgentSlot> agents) {
+            if (areas == null || agents == null) {
+                throw new IllegalArgumentException("Areas and agents are required");
+            }
+            for (AreaLoad a : areas) {
+                if (a.orders() < 0) {
+                    throw new IllegalArgumentException("Area " + a.areaName() + " has negative orders");
+                }
+            }
+            for (AgentSlot s : agents) {
+                if (s.capacity() < 0) {
+                    throw new IllegalArgumentException("Agent " + s.agentName() + " has negative capacity");
+                }
+            }
+
+            // remaining capacity per agent, in a stable order
+            Map<Long, Integer> left = new LinkedHashMap<>();
+            Map<Long, AgentSlot> byId = new LinkedHashMap<>();
+            for (AgentSlot s : agents) {
+                left.put(s.agentId(), s.capacity());
+                byId.put(s.agentId(), s);
+            }
+
+            int totalCapacity = left.values().stream().mapToInt(Integer::intValue).sum();
+            int totalOrders = areas.stream().mapToInt(AreaLoad::orders).sum();
+
+            // biggest areas first, name as tie-break so the plan is repeatable
+            List<AreaLoad> queue = new ArrayList<>(areas);
+            queue.sort(Comparator.comparingInt(AreaLoad::orders).reversed()
+                    .thenComparing(AreaLoad::areaName));
+
+            List<Assignment> assignments = new ArrayList<>();
+            List<Leftover> leftovers = new ArrayList<>();
+            List<String> notes = new ArrayList<>();
+
+            for (AreaLoad area : queue) {
+                int remaining = area.orders();
+                if (remaining == 0) {
+                    continue;
+                }
+                int pieces = 0;
+
+                while (remaining > 0) {
+                    Long chosen = pick(area.areaId(), remaining, left, byId);
+                    if (chosen == null) {
+                        leftovers.add(new Leftover(area.areaId(), area.areaName(), remaining,
+                                totalCapacity == 0 ? "no agents available today"
+                                                   : "every agent is at their daily limit"));
+                        break;
+                    }
+                    int take = Math.min(remaining, left.get(chosen));
+                    boolean partial = take < area.orders();
+                    assignments.add(new Assignment(chosen, byId.get(chosen).agentName(),
+                            area.areaId(), area.areaName(), take, partial));
+                    left.put(chosen, left.get(chosen) - take);
+                    remaining -= take;
+                    pieces++;
+                }
+
+                if (pieces > 1) {
+                    notes.add(area.areaName() + " is too big for one agent, so it is split across "
+                            + pieces + " agents.");
+                }
+            }
+
+            // how many areas each agent ended up with
+            Map<Long, Long> areasPerAgent = assignments.stream().collect(
+                    Collectors.groupingBy(Assignment::agentId,
+                            Collectors.mapping(Assignment::areaId, Collectors.collectingAndThen(
+                                    Collectors.toSet(), s -> (long) s.size()))));
+            areasPerAgent.forEach((agentId, count) -> {
+                if (count > 1) {
+                    notes.add(byId.get(agentId).agentName() + " covers " + count + " areas today.");
+                }
+            });
+
+            int carried = leftovers.stream().mapToInt(Leftover::orders).sum();
+            if (carried > 0) {
+                notes.add(carried + " orders do not fit today and will carry over. Capacity is "
+                        + totalCapacity + " stops for " + totalOrders + " orders.");
+            }
+
+            return new Result(assignments, leftovers, notes, totalCapacity, totalOrders);
+        }
+
+        /**
+         * Prefers the agent who covered this area last and can take all of it,
+         * otherwise the agent with the most spare capacity.
+         */
+        private static Long pick(Long areaId, int needed, Map<Long, Integer> left,
+                                 Map<Long, AgentSlot> byId) {
+            Long sticky = null;
+            for (AgentSlot s : byId.values()) {
+                if (areaId.equals(s.lastCoveredAreaId()) && left.get(s.agentId()) >= needed) {
+                    sticky = s.agentId();
+                    break;
+                }
+            }
+            if (sticky != null) {
+                return sticky;
+            }
+            Long best = null;
+            int bestLeft = 0;
+            for (Map.Entry<Long, Integer> e : left.entrySet()) {
+                if (e.getValue() > bestLeft) {
+                    best = e.getKey();
+                    bestLeft = e.getValue();
+                }
+            }
+            return best;
         }
     }
 

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DropPoint — Control Console</title>
+<style>
+  :root { --ink:#1c2733; --soft:#4d5b69; --rule:#d5dce3; --paper:#f5f7f9;
+          --blue:#1f6e8c; --green:#1e6b47; --amber:#9a6a00; --red:#b3261e; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--paper); color:var(--ink); }
+  header { background:#fff; border-bottom:1px solid var(--rule); padding:13px 22px;
+           display:flex; align-items:center; gap:20px; position:sticky; top:0; z-index:9; }
+  h1 { font-size:1.15rem; margin:0; }
+  nav { margin-left:auto; display:flex; gap:15px; }
+  nav a { color:var(--blue); text-decoration:none; font-size:0.92rem; }
+  main { display:grid; grid-template-columns:1fr 380px; gap:18px; padding:20px;
+         max-width:1400px; margin:0 auto; align-items:start; }
+  @media (max-width:1050px) { main { grid-template-columns:1fr; } }
+  .panel { background:#fff; border:1px solid var(--rule); border-radius:10px;
+           padding:15px 17px; margin-bottom:16px; }
+  .panel h2 { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em;
+              color:var(--soft); margin:0 0 4px; }
+  .panel p.hint { color:var(--soft); font-size:0.85rem; margin:0 0 11px; }
+  label { display:block; font-size:0.82rem; color:var(--soft); margin:9px 0 3px; }
+  select, input { width:100%; padding:8px 10px; border:1px solid var(--rule);
+                  border-radius:7px; font-size:0.93rem; background:#fff; color:var(--ink); }
+  .row { display:flex; gap:10px; }
+  .row > * { flex:1; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  button { padding:8px 14px; border:0; border-radius:7px; font-size:0.9rem;
+           cursor:pointer; background:var(--blue); color:#fff; }
+  button:hover { filter:brightness(0.92); }
+  button.ghost { background:#fff; border:1px solid var(--rule); color:var(--ink); }
+  button.good { background:var(--green); }
+  button.warn { background:var(--amber); }
+  button.bad  { background:var(--red); }
+  button:disabled { opacity:0.45; cursor:default; }
+  table { width:100%; border-collapse:collapse; font-size:0.89rem; }
+  th,td { text-align:left; padding:6px 9px; border-bottom:1px solid var(--rule); }
+  th { font-size:0.78rem; color:var(--soft); text-transform:uppercase; letter-spacing:0.04em; }
+  tr:last-child td { border-bottom:none; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+  .on { background:var(--green); } .off { background:var(--rule); }
+  #log { background:#12191f; color:#cfe3ee; border-radius:10px; padding:13px 15px;
+         font-family:"JetBrains Mono",Consolas,monospace; font-size:0.78rem; line-height:1.55;
+         height:calc(100vh - 150px); overflow-y:auto; position:sticky; top:74px; }
+  #log .ok { color:#7fd6a5; } #log .err { color:#ff9c92; }
+  #log .dim { color:#6d8494; } #log .t { color:#f0c46a; }
+  #log div { margin-bottom:9px; white-space:pre-wrap; word-break:break-word; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Control console</h1>
+  <span id="clock" style="color:var(--soft); font-size:0.87rem"></span>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/stats.html">Full numbers</a>
+    <a href="/assistant.html">Assistant</a>
+  </nav>
+</header>
+
+<main>
+  <div>
+
+    <!-- 1. RESET -->
+    <div class="panel">
+      <h2>1 · Start fresh</h2>
+      <p class="hint">Clears today's activity, puts Suresh on duty and creates one waiting order.
+         The 60-day history is untouched.</p>
+      <div class="btns">
+        <button class="warn" onclick="reset()">Reset for demo</button>
+        <button class="ghost" onclick="health()">Health check</button>
+        <button class="ghost" onclick="refreshAll()">Refresh everything</button>
+      </div>
+    </div>
+
+    <!-- 2. ATTENDANCE -->
+    <div class="panel">
+      <h2>2 · Attendance</h2>
+      <p class="hint">Check-in only works within 200 m of the branch, with good GPS and no fake location.</p>
+      <div class="row">
+        <div>
+          <label>Agent</label>
+          <select id="attAgent"></select>
+        </div>
+        <div>
+          <label>Where they are</label>
+          <select id="attWhere">
+            <option value="branch">At the branch (should work)</option>
+            <option value="home">At home, 8.4 km away (too far)</option>
+            <option value="mock">At the branch, fake GPS app on</option>
+            <option value="weak">At the branch, weak signal (250 m accuracy)</option>
+          </select>
+        </div>
+      </div>
+      <div class="btns">
+        <button onclick="checkIn()">Check in</button>
+        <button class="ghost" onclick="ping()">Send a position ping</button>
+        <button class="ghost" onclick="checkOut()">Check out</button>
+      </div>
+      <table style="margin-top:13px">
+        <thead><tr><th>Agent</th><th>Status</th><th>Active orders</th></tr></thead>
+        <tbody id="agentRows"><tr><td colspan="3">Loading…</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- 3. BOOK AN ORDER -->
+    <div class="panel">
+      <h2>3 · Book an order</h2>
+      <p class="hint">Pick a customer. The building type and floor drive the ETA.</p>
+      <div class="row">
+        <div>
+          <label>Customer</label>
+          <select id="ordCustomer"></select>
+        </div>
+        <div style="max-width:120px">
+          <label>Cylinders</label>
+          <input id="ordCount" type="number" value="2" min="1" max="10">
+        </div>
+      </div>
+      <div id="custInfo" style="color:var(--soft); font-size:0.83rem; margin-top:7px"></div>
+      <div class="btns">
+        <button class="good" onclick="createOrder()">Create order</button>
+      </div>
+    </div>
+
+    <!-- 4. ASSIGN -->
+    <div class="panel">
+      <h2>4 · Open orders</h2>
+      <p class="hint">What is booked and what it is waiting on. Assignment moves to the day plan.</p>
+      <table>
+        <thead><tr><th>Order</th><th>Customer</th><th>Status</th><th>Agent</th><th>ETA</th></tr></thead>
+        <tbody id="orderRows"><tr><td colspan="5">Loading…</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- 5. DELIVER -->
+    <div class="panel">
+      <h2>5 · Deliver</h2>
+      <p class="hint">Wrong code blocks the delivery. Right code far from the address records it but flags it.</p>
+      <label>Agent</label>
+      <select id="delAgent" onchange="loadAgentOrders()"></select>
+      <table style="margin-top:11px">
+        <thead><tr><th>Order</th><th>Customer</th><th>Code</th><th>Actions</th></tr></thead>
+        <tbody id="delRows"><tr><td colspan="4">Pick an agent.</td></tr></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <div id="log"><div class="dim">Actions and replies appear here.</div></div>
+</main>
+
+<script>
+const BRANCH = { lat: 17.3457, lon: 78.5522 };
+const HOME   = { lat: 17.3616, lon: 78.4747 };   // Charminar, 8.4 km away
+let customers = [], agents = [];
+
+/* ---------- logging ---------- */
+function log(title, data, isError) {
+  const box = document.getElementById('log');
+  const d = document.createElement('div');
+  const time = new Date().toLocaleTimeString();
+  const body = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  d.innerHTML = `<span class="dim">${time}</span> <span class="t">${title}</span>\n`
+              + `<span class="${isError ? 'err' : 'ok'}">${escapeHtml(body)}</span>`;
+  box.prepend(d);
+}
+function escapeHtml(s) {
+  return s.replace(/[&<>]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[c]));
+}
+
+async function call(title, url, options) {
+  try {
+    const res = await fetch(url, options);
+    const out = await res.json();
+    log(title, out, !res.ok);
+    refreshAll();
+    return res.ok ? out : null;
+  } catch (e) {
+    log(title, 'Cannot reach the server.', true);
+    return null;
+  }
+}
+const post = (title, url, body) => call(title, url, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: body === undefined ? undefined : JSON.stringify(body)
+});
+
+/* ---------- 1. reset and health ---------- */
+const reset  = () => post('Reset for demo', '/api/demo/reset');
+const health = () => call('Health check', '/api/demo/health');
+
+/* ---------- 2. attendance ---------- */
+function attendanceBody() {
+  switch (document.getElementById('attWhere').value) {
+    case 'home': return { latitude: HOME.lat, longitude: HOME.lon, accuracyMetres: 15, mockLocation: false };
+    case 'mock': return { latitude: BRANCH.lat + 0.0004, longitude: BRANCH.lon, accuracyMetres: 12, mockLocation: true };
+    case 'weak': return { latitude: BRANCH.lat + 0.0004, longitude: BRANCH.lon, accuracyMetres: 250, mockLocation: false };
+    default:     return { latitude: BRANCH.lat + 0.0004, longitude: BRANCH.lon, accuracyMetres: 12, mockLocation: false };
+  }
+}
+
+async function checkIn() {
+  const id = document.getElementById('attAgent').value;
+  const body = attendanceBody();
+  const out = await post(`Check in — agent ${id}`, `/api/agents/${id}/check-in`, body);
+  // a successful check-in also needs a position before the agent can be ranked
+  if (out && out.allowed) {
+    await post(`Position ping — agent ${id}`, `/api/agents/${id}/ping`,
+      { latitude: body.latitude, longitude: body.longitude, accuracyMetres: body.accuracyMetres, simulated: false });
+  }
+}
+
+function ping() {
+  const id = document.getElementById('attAgent').value;
+  post(`Position ping — agent ${id}`, `/api/agents/${id}/ping`,
+    { latitude: BRANCH.lat + (Math.random() - 0.5) * 0.002,
+      longitude: BRANCH.lon + (Math.random() - 0.5) * 0.002,
+      accuracyMetres: 12, simulated: false });
+}
+
+function checkOut() {
+  const id = document.getElementById('attAgent').value;
+  post(`Check out — agent ${id}`, `/api/agents/${id}/check-out`);
+}
+
+/* ---------- 3. orders ---------- */
+function showCustomer() {
+  const c = customers.find(x => String(x.id) === document.getElementById('ordCustomer').value);
+  document.getElementById('custInfo').textContent = c
+    ? `${c.customer_type.toLowerCase()} · ${c.building_type.toLowerCase()} · floor ${c.floor_no}`
+      + ` · ${c.has_lift ? 'lift' : 'no lift'}`
+      + (c.last_order ? ` · last order ${c.last_order}` : ' · never ordered')
+    : '';
+}
+
+function createOrder() {
+  post('Create order', '/api/orders', {
+    customerId: Number(document.getElementById('ordCustomer').value),
+    cylinderCount: Number(document.getElementById('ordCount').value)
+  });
+}
+
+/* ---------- 5. deliveries ---------- */
+async function loadAgentOrders() {
+  const id = document.getElementById('delAgent').value;
+  const rows = document.getElementById('delRows');
+  if (!id) { rows.innerHTML = '<tr><td colspan="4">Pick an agent.</td></tr>'; return; }
+  try {
+    const list = await fetch(`/api/agents/${id}/orders`).then(r => r.json());
+    rows.innerHTML = list.length === 0
+      ? '<tr><td colspan="4">No orders assigned.</td></tr>'
+      : list.map(o => `
+        <tr>
+          <td><code>${o.orderNo}</code></td>
+          <td>${o.customerName}<br><small style="color:var(--soft)">${o.etaMinutes ?? '—'} min ETA</small></td>
+          <td><b>${o.deliveryCode}</b></td>
+          <td>
+            <button class="good" onclick="deliver(${o.orderId}, ${id}, '${o.deliveryCode}', ${o.latitude}, ${o.longitude}, 'at the door')">At the door</button>
+            <button class="bad" onclick="deliver(${o.orderId}, ${id}, '0000', ${o.latitude}, ${o.longitude}, 'wrong code')">Wrong code</button>
+            <button class="warn" onclick="deliver(${o.orderId}, ${id}, '${o.deliveryCode}', ${o.latitude + 0.027}, ${o.longitude}, '3 km away')">3 km away</button>
+            <button class="ghost" onclick="failOrder(${o.orderId}, ${id})">Nobody home</button>
+          </td>
+        </tr>`).join('');
+  } catch (e) {
+    rows.innerHTML = '<tr><td colspan="4">Could not load.</td></tr>';
+  }
+}
+
+async function deliver(orderId, agentId, code, lat, lon, label) {
+  await post(`Deliver order ${orderId} (${label})`, `/api/orders/${orderId}/deliver`,
+    { agentId: Number(agentId), latitude: lat, longitude: lon, code });
+  loadAgentOrders();
+}
+
+async function failOrder(orderId, agentId) {
+  await post(`Fail order ${orderId}`, `/api/orders/${orderId}/fail`,
+    { agentId: Number(agentId), reason: 'NOBODY_HOME' });
+  loadAgentOrders();
+}
+
+/* ---------- loading ---------- */
+function fillSelect(el, items, valueKey, labelFn, keepValue) {
+  const previous = keepValue ? el.value : null;
+  el.innerHTML = items.map(i => `<option value="${i[valueKey]}">${labelFn(i)}</option>`).join('');
+  if (previous && items.some(i => String(i[valueKey]) === previous)) el.value = previous;
+}
+
+async function refreshAll() {
+  try {
+    agents = await fetch('/api/agents').then(r => r.json());
+    const label = a => `${a.name}${a.on_duty ? ' — on duty' : ''}`;
+    fillSelect(document.getElementById('attAgent'), agents, 'id', label, true);
+    fillSelect(document.getElementById('delAgent'), agents, 'id', label, true);
+
+    document.getElementById('agentRows').innerHTML = agents.map(a => `
+      <tr>
+        <td><span class="dot ${a.on_duty ? 'on' : 'off'}"></span>${a.name}</td>
+        <td>${a.on_duty ? 'On duty' : a.checked_in_today ? 'Checked out' : 'Not checked in'}</td>
+        <td>${a.active_orders}</td>
+      </tr>`).join('');
+
+    const orders = await fetch('/api/orders').then(r => r.json());
+    document.getElementById('orderRows').innerHTML = orders.length === 0
+      ? '<tr><td colspan="5">No open orders.</td></tr>'
+      : orders.slice(0, 10).map(o => `
+        <tr>
+          <td><code>${o.orderNo}</code></td>
+          <td>${o.customerName}</td>
+          <td>${o.status}</td>
+          <td>${o.agentName ?? '—'}</td>
+          <td title="${o.etaExplanation ?? ''}">${o.etaMinutes == null ? '—'
+              : `${o.etaMinutes} min<br><small style="color:var(--soft)">${o.travelMinutes} drive + ${o.handoverMinutes} door</small>`}</td>
+        </tr>`).join('');
+
+    // the selects are filled in code, so delAgent's onchange never fires on its own
+    loadAgentOrders();
+  } catch (e) {
+    log('Refresh', 'Cannot reach the server.', true);
+  }
+}
+
+async function loadCustomers() {
+  customers = await fetch('/api/customers').then(r => r.json());
+  fillSelect(document.getElementById('ordCustomer'), customers, 'id',
+    c => `${c.name} (${c.customer_type === 'COMMERCIAL' ? 'commercial' : 'home'})`, true);
+  showCustomer();
+}
+
+document.getElementById('ordCustomer').addEventListener('change', showCustomer);
+
+function tick() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', timeStyle: 'medium' });
+}
+
+loadCustomers(); refreshAll(); tick();
+setInterval(tick, 1000);
+setInterval(refreshAll, 10000);
+</script>
+</body>
+</html>

@@ -20,12 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.droppoint.core.GeoPoint;
-import com.droppoint.core.Rules.AssignmentRanker;
 import com.droppoint.core.Rules.EtaCalculator;
 import com.droppoint.core.Rules.ProofPolicy;
 import com.droppoint.repo.Workforce.AppUser;
 import com.droppoint.repo.Workforce.AppUser.AppUserRepository;
-import com.droppoint.repo.Workforce.Attendance.AttendanceRepository;
 import com.droppoint.repo.Deliveries.Customer;
 import com.droppoint.repo.Deliveries.Customer.CustomerRepository;
 import com.droppoint.repo.Deliveries.DeliveryOrder;
@@ -36,17 +34,14 @@ import com.droppoint.repo.Workforce.LocationPing;
 import com.droppoint.repo.Workforce.LocationPing.LocationPingRepository;
 
 /**
- * The life of an order: booking, ranking and assigning an agent, the ETA that
- * follows from the assignment, and the proof of delivery that closes it.
+ * The life of an order: booking, assigning an agent, the ETA that follows from
+ * the assignment, and the proof of delivery that closes it.
  * Travel time comes from the nested DistanceClient.
  */
 @Service
 public class OrderService {
 
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
-
-    private static final double WORKLOAD_WEIGHT_KM = 2.5;
-    private static final int MAX_ORDERS_PER_AGENT = 6;
 
     /** Beyond this distance from the address a delivery is flagged, not blocked. */
     private static final double MAX_PROOF_DISTANCE_M = 150;
@@ -71,19 +66,17 @@ public class OrderService {
     private final DeliveryOrderRepository orders;
     private final CustomerRepository customers;
     private final AppUserRepository users;
-    private final AttendanceRepository attendances;
     private final LocationPingRepository pings;
     private final DeliveryProofRepository proofs;
     private final DistanceClient distances;
 
     public OrderService(DeliveryOrderRepository orders, CustomerRepository customers,
-                        AppUserRepository users, AttendanceRepository attendances,
-                        LocationPingRepository pings, DeliveryProofRepository proofs,
+                        AppUserRepository users, LocationPingRepository pings,
+                        DeliveryProofRepository proofs,
                         @Value("${droppoint.google.api-key:}") String googleApiKey) {
         this.orders = orders;
         this.customers = customers;
         this.users = users;
-        this.attendances = attendances;
         this.pings = pings;
         this.proofs = proofs;
         this.distances = new DistanceClient(googleApiKey);
@@ -115,39 +108,6 @@ public class OrderService {
 
     // ---- assignment and ETA ----
 
-    /** Ranks on-duty agents for this order, best first. */
-    @Transactional(readOnly = true)
-    public List<AssignmentRanker.Ranked> suggestAgents(Long orderId) {
-        DeliveryOrder order = orders.findById(orderId)
-                .orElseThrow(() -> new NoSuchElementException("Order " + orderId + " not found"));
-        Customer customer = customers.findById(order.getCustomerId())
-                .orElseThrow(() -> new NoSuchElementException("Customer not found"));
-
-        GeoPoint destination = new GeoPoint(customer.getLatitude(), customer.getLongitude());
-        LocalDate today = LocalDate.ofInstant(Instant.now(), BUSINESS_ZONE);
-
-        List<AssignmentRanker.Candidate> candidates = new ArrayList<>();
-        for (AppUser user : users.findAll()) {
-            if (user.getRole() != AppUser.Role.AGENT || !user.isActive()
-                    || !order.getBranchId().equals(user.getBranchId())) {
-                continue;
-            }
-            var duty = attendances.findByAgentIdAndWorkDate(user.getId(), today);
-            if (duty.isEmpty() || duty.get().getCheckOutAt() != null) {
-                continue;   // not on duty
-            }
-            LocationPing last = pings.findTopByAgentIdOrderByRecordedAtDesc(user.getId());
-            if (last == null) {
-                continue;   // no known position yet
-            }
-            int active = (int) orders.countByAssignedAgentIdAndStatus(user.getId(), DeliveryOrder.Status.ASSIGNED);
-            candidates.add(new AssignmentRanker.Candidate(user.getId(), user.getFullName(),
-                    new GeoPoint(last.getLatitude(), last.getLongitude()), active));
-        }
-
-        return new AssignmentRanker(WORKLOAD_WEIGHT_KM, MAX_ORDERS_PER_AGENT).rank(destination, candidates);
-    }
-
     @Transactional
     public OrderView assign(Long orderId, Long agentId) {
         DeliveryOrder order = orders.findById(orderId)
@@ -167,16 +127,6 @@ public class OrderService {
         Customer customer = customers.findById(order.getCustomerId()).orElseThrow();
         applyEta(order, customer, agentId);
         return toView(order, customer, agent.getFullName());
-    }
-
-    /** Assigns the order to the best-ranked agent. */
-    @Transactional
-    public OrderView autoAssign(Long orderId) {
-        List<AssignmentRanker.Ranked> ranked = suggestAgents(orderId);
-        if (ranked.isEmpty()) {
-            throw new IllegalArgumentException("No agent is available for this order right now");
-        }
-        return assign(orderId, ranked.get(0).agentId());
     }
 
     @Transactional(readOnly = true)

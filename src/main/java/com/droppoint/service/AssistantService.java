@@ -427,4 +427,46 @@ public class AssistantService {
                          WHERE verdict = 'SUSPICIOUS' AND recorded_at::date = CURRENT_DATE) AS flagged_today
                 """);
     }
+
+    // ---- lookups for the control console (not reachable by the model) ----
+
+    /** Customers the console can book orders for. */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> customerList() {
+        return jdbc.queryForList("""
+                SELECT c.id, c.name, c.customer_type, c.building_type, c.floor_no,
+                       c.has_lift, c.latitude, c.longitude,
+                       -- as text, or Jackson serialises the date through UTC and shows the day before
+                       (SELECT max(o.booked_at)::date::text FROM orders o WHERE o.customer_id = c.id) AS last_order
+                  FROM customer c
+                 WHERE c.active
+                 ORDER BY c.customer_type, c.name
+                """);
+    }
+
+    /** Localities the branch delivers to, for the intake page. */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> areaList() {
+        return jdbc.queryForList("""
+                SELECT id, name FROM area WHERE active ORDER BY name
+                """);
+    }
+
+    /** Agents with their duty status right now. */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> agentList() {
+        return jdbc.queryForList("""
+                SELECT u.id, u.full_name AS name,
+                       EXISTS (SELECT 1 FROM attendance a
+                                WHERE a.agent_id = u.id AND a.work_date = CURRENT_DATE
+                                  AND a.check_out_at IS NULL) AS on_duty,
+                       EXISTS (SELECT 1 FROM attendance a
+                                WHERE a.agent_id = u.id AND a.work_date = CURRENT_DATE) AS checked_in_today,
+                       (SELECT count(*) FROM orders o
+                         WHERE o.assigned_agent_id = u.id AND o.status = 'ASSIGNED') AS active_orders
+                  FROM app_user u
+                 WHERE u.role = 'AGENT' AND u.active
+                 ORDER BY u.id
+                """);
+    }
 }

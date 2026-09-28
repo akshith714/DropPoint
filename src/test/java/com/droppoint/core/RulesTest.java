@@ -10,7 +10,6 @@ import java.util.List;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import com.droppoint.core.Rules.AssignmentRanker;
 import com.droppoint.core.Rules.CheckInPolicy;
 import com.droppoint.core.Rules.EtaCalculator;
 import com.droppoint.core.Rules.EtaCalculator.BuildingType;
@@ -23,10 +22,6 @@ class RulesTest {
     /** One degree of latitude is about 111,195 m, which is close enough to place a test point. */
     private static GeoPoint metresNorthOf(GeoPoint p, double metres) {
         return new GeoPoint(p.latitude() + metres / 111_194.93, p.longitude());
-    }
-
-    private static GeoPoint kmNorthOf(GeoPoint p, double km) {
-        return metresNorthOf(p, km * 1000);
     }
 
     @Nested
@@ -104,88 +99,6 @@ class RulesTest {
             assertThrows(IllegalArgumentException.class, () -> policy.evaluate(BRANCH, null, 10, false));
             assertThrows(IllegalArgumentException.class, () -> policy.evaluate(BRANCH, BRANCH, -5, false));
             assertThrows(IllegalArgumentException.class, () -> policy.evaluate(BRANCH, BRANCH, Double.NaN, false));
-        }
-    }
-
-    @Nested
-    class Assignment {
-
-        private static final GeoPoint DESTINATION = new GeoPoint(17.3689, 78.5247);
-        private final AssignmentRanker ranker = new AssignmentRanker(2.5, 6);
-
-        @Test
-        void nearestAgentWinsWhenWorkloadIsEqual() {
-            var near = new AssignmentRanker.Candidate(1L, "Near", kmNorthOf(DESTINATION, 1), 0);
-            var far = new AssignmentRanker.Candidate(2L, "Far", kmNorthOf(DESTINATION, 5), 0);
-
-            List<AssignmentRanker.Ranked> result = ranker.rank(DESTINATION, List.of(far, near));
-
-            assertEquals(1L, result.get(0).agentId());
-            assertEquals(1.0, result.get(0).distanceKm(), 0.05);
-        }
-
-        @Test
-        void busyNearAgentLosesToFreeFartherAgent() {
-            var busy = new AssignmentRanker.Candidate(1L, "Busy", kmNorthOf(DESTINATION, 1), 3);   // 1 + 7.5 = 8.5
-            var free = new AssignmentRanker.Candidate(2L, "Free", kmNorthOf(DESTINATION, 4), 0);   // 4 + 0   = 4.0
-
-            List<AssignmentRanker.Ranked> result = ranker.rank(DESTINATION, List.of(busy, free));
-
-            assertEquals(2L, result.get(0).agentId());
-            assertEquals(4.0, result.get(0).score(), 0.05);
-            assertEquals(8.5, result.get(1).score(), 0.05);
-        }
-
-        @Test
-        void agentsAtTheOrderLimitAreExcluded() {
-            var full = new AssignmentRanker.Candidate(1L, "Full", kmNorthOf(DESTINATION, 0.5), 6);
-            var open = new AssignmentRanker.Candidate(2L, "Open", kmNorthOf(DESTINATION, 9), 5);
-
-            List<AssignmentRanker.Ranked> result = ranker.rank(DESTINATION, List.of(full, open));
-
-            assertEquals(1, result.size());
-            assertEquals(2L, result.get(0).agentId());
-        }
-
-        @Test
-        void tiesAreBrokenDeterministically() {
-            var a = new AssignmentRanker.Candidate(7L, "A", kmNorthOf(DESTINATION, 2), 1);
-            var b = new AssignmentRanker.Candidate(3L, "B", kmNorthOf(DESTINATION, 2), 1);
-
-            List<AssignmentRanker.Ranked> first = ranker.rank(DESTINATION, List.of(a, b));
-            List<AssignmentRanker.Ranked> second = ranker.rank(DESTINATION, List.of(b, a));
-
-            assertEquals(3L, first.get(0).agentId());
-            assertEquals(first.get(0).agentId(), second.get(0).agentId());
-        }
-
-        @Test
-        void emptyCandidateListGivesEmptyResult() {
-            assertTrue(ranker.rank(DESTINATION, List.of()).isEmpty());
-        }
-
-        @Test
-        void explanationDescribesDistanceAndLoad() {
-            var one = new AssignmentRanker.Candidate(1L, "One", kmNorthOf(DESTINATION, 2), 1);
-            assertEquals("2.0 km away, 1 active order", ranker.rank(DESTINATION, List.of(one)).get(0).explanation());
-        }
-
-        @Test
-        void invalidSettingsAreRejected() {
-            assertThrows(IllegalArgumentException.class, () -> new AssignmentRanker(-1, 6));
-            assertThrows(IllegalArgumentException.class, () -> new AssignmentRanker(Double.NaN, 6));
-            assertThrows(IllegalArgumentException.class, () -> new AssignmentRanker(2.5, 0));
-        }
-
-        @Test
-        void invalidInputsAreRejected() {
-            var ok = new AssignmentRanker.Candidate(1L, "Ok", DESTINATION, 0);
-            assertThrows(IllegalArgumentException.class, () -> ranker.rank(null, List.of(ok)));
-            assertThrows(IllegalArgumentException.class, () -> ranker.rank(DESTINATION, null));
-            assertThrows(IllegalArgumentException.class, () -> ranker.rank(DESTINATION,
-                    List.of(new AssignmentRanker.Candidate(2L, "NoPos", null, 0))));
-            assertThrows(IllegalArgumentException.class, () -> ranker.rank(DESTINATION,
-                    List.of(new AssignmentRanker.Candidate(3L, "Negative", DESTINATION, -1))));
         }
     }
 
@@ -346,6 +259,131 @@ class RulesTest {
                     () -> policy.evaluate(CUSTOMER, CUSTOMER, null, 3L, "4821", "4821"));
             assertThrows(IllegalArgumentException.class,
                     () -> policy.evaluate(CUSTOMER, CUSTOMER, 3L, 3L, "", "4821"));
+        }
+    }
+
+    @Nested
+    class Planning {
+
+        private static Rules.DayPlan.AreaLoad area(long id, String name, int orders) {
+            return new Rules.DayPlan.AreaLoad(id, name, orders, orders);
+        }
+
+        private static Rules.DayPlan.AgentSlot agent(long id, String name, int cap) {
+            return new Rules.DayPlan.AgentSlot(id, name, cap, null);
+        }
+
+        @Test
+        void sixAgentsAndSixAreasGetOneEach() {
+            List<Rules.DayPlan.AreaLoad> areas = List.of(
+                    area(1, "LB Nagar", 20), area(2, "Kothapet", 22), area(3, "Nagole", 18),
+                    area(4, "Sainagar", 15), area(5, "Vanasthalipuram", 25), area(6, "Hayathnagar", 12));
+            List<Rules.DayPlan.AgentSlot> agents = List.of(
+                    agent(1, "A", 40), agent(2, "B", 40), agent(3, "C", 40),
+                    agent(4, "D", 40), agent(5, "E", 40), agent(6, "F", 40));
+
+            var result = Rules.DayPlan.plan(areas, agents);
+
+            assertEquals(6, result.assignments().size());
+            assertEquals(6, result.assignments().stream()
+                    .map(Rules.DayPlan.Assignment::agentId).distinct().count(),
+                    "each agent should get exactly one area");
+            assertTrue(result.leftovers().isEmpty());
+        }
+
+        @Test
+        void fourAgentsCoverSixAreas() {
+            List<Rules.DayPlan.AreaLoad> areas = List.of(
+                    area(1, "LB Nagar", 20), area(2, "Kothapet", 22), area(3, "Nagole", 18),
+                    area(4, "Sainagar", 15), area(5, "Vanasthalipuram", 25), area(6, "Hayathnagar", 12));
+            List<Rules.DayPlan.AgentSlot> agents = List.of(
+                    agent(1, "A", 40), agent(2, "B", 40), agent(3, "C", 40), agent(4, "D", 40));
+
+            var result = Rules.DayPlan.plan(areas, agents);
+
+            assertTrue(result.leftovers().isEmpty(), "112 orders fit in 160 capacity");
+            assertEquals(112, result.assignments().stream()
+                    .mapToInt(Rules.DayPlan.Assignment::orders).sum());
+            assertTrue(result.notes().stream().anyMatch(n -> n.contains("covers 2 areas")),
+                    "someone must be doing two areas: " + result.notes());
+        }
+
+        @Test
+        void areaBiggerThanOneAgentIsSplit() {
+            var result = Rules.DayPlan.plan(
+                    List.of(area(1, "Kothapet", 58)),
+                    List.of(agent(1, "A", 40), agent(2, "B", 40)));
+
+            assertEquals(2, result.assignments().size());
+            assertEquals(58, result.assignments().stream()
+                    .mapToInt(Rules.DayPlan.Assignment::orders).sum());
+            assertTrue(result.assignments().stream().allMatch(Rules.DayPlan.Assignment::partial));
+            assertTrue(result.notes().stream().anyMatch(n -> n.contains("split across 2")));
+        }
+
+        @Test
+        void theAgentWhoCoveredAnAreaLastKeepsIt() {
+            var areas = List.of(area(7, "Kothapet", 20));
+            var agents = List.of(
+                    agent(1, "Free", 40),                                        // more spare
+                    new Rules.DayPlan.AgentSlot(2L, "Regular", 30, 7L));         // covered it last
+
+            var result = Rules.DayPlan.plan(areas, agents);
+
+            assertEquals(2L, result.assignments().get(0).agentId());
+        }
+
+        @Test
+        void theRegularAgentLosesTheAreaWhenTooFull() {
+            var areas = List.of(area(7, "Kothapet", 20));
+            var agents = List.of(
+                    agent(1, "Free", 40),
+                    new Rules.DayPlan.AgentSlot(2L, "Regular", 5, 7L));   // not enough room
+
+            var result = Rules.DayPlan.plan(areas, agents);
+
+            assertEquals(1L, result.assignments().get(0).agentId());
+        }
+
+        @Test
+        void ordersBeyondCapacityCarryOver() {
+            var result = Rules.DayPlan.plan(
+                    List.of(area(1, "Kothapet", 60), area(2, "Nagole", 30)),
+                    List.of(agent(1, "A", 40), agent(2, "B", 40)));
+
+            assertEquals(10, result.leftovers().stream()
+                    .mapToInt(Rules.DayPlan.Leftover::orders).sum());
+            assertTrue(result.notes().stream().anyMatch(n -> n.contains("carry over")));
+        }
+
+        @Test
+        void noAgentsMeansEverythingCarriesOver() {
+            var result = Rules.DayPlan.plan(List.of(area(1, "Kothapet", 12)), List.of());
+
+            assertTrue(result.assignments().isEmpty());
+            assertEquals(12, result.leftovers().get(0).orders());
+            assertTrue(result.leftovers().get(0).reason().contains("no agents"));
+        }
+
+        @Test
+        void samePlanEveryTimeForTheSameInput() {
+            var areas = List.of(area(1, "LB Nagar", 20), area(2, "Kothapet", 20), area(3, "Nagole", 20));
+            var agents = List.of(agent(1, "A", 40), agent(2, "B", 40));
+
+            var first = Rules.DayPlan.plan(areas, agents);
+            var second = Rules.DayPlan.plan(areas, agents);
+
+            assertEquals(first.assignments(), second.assignments());
+        }
+
+        @Test
+        void invalidInputsAreRejected() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> Rules.DayPlan.plan(null, List.of()));
+            assertThrows(IllegalArgumentException.class,
+                    () -> Rules.DayPlan.plan(List.of(area(1, "X", -1)), List.of()));
+            assertThrows(IllegalArgumentException.class,
+                    () -> Rules.DayPlan.plan(List.of(), List.of(agent(1, "A", -5))));
         }
     }
 }

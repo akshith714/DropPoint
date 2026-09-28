@@ -16,11 +16,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.droppoint.core.Rules.AssignmentRanker;
 import com.droppoint.repo.Deliveries.DeliveryProof;
 import com.droppoint.service.AssistantService;
 import com.droppoint.service.DemoService;
 import com.droppoint.service.AgentService;
+import com.droppoint.service.IntakeService;
 import com.droppoint.service.OrderService;
 
 @RestController
@@ -31,9 +31,6 @@ public class ApiController {
 
     public record PingRequest(double latitude, double longitude, double accuracyMetres, boolean simulated) { }
 
-    public record SimulateRequest(double fromLat, double fromLon, double toLat, double toLon,
-                                  Integer steps, Integer secondsPerStep) { }
-
     public record CreateOrderRequest(Long customerId, Integer cylinderCount) { }
 
     public record DeliverRequest(Long agentId, double latitude, double longitude, String code) { }
@@ -42,21 +39,22 @@ public class ApiController {
 
     public record AskRequest(String question) { }
 
-    public record DriveRequest(Long agentId, Double toLat, Double toLon,
-                               Integer steps, Integer secondsPerStep) { }
+    public record IntakeRequest(String text) { }
 
     private final AgentService agents;
     private final OrderService orders;
     private final AssistantService assistant;
     private final DemoService demo;
+    private final IntakeService intake;
 
     public ApiController(AgentService agents, OrderService orders,
                          AssistantService assistant,
-                         DemoService demo) {
+                         DemoService demo, IntakeService intake) {
         this.agents = agents;
         this.orders = orders;
         this.assistant = assistant;
         this.demo = demo;
+        this.intake = intake;
     }
 
     // ---- endpoints ----
@@ -83,19 +81,6 @@ public class ApiController {
                 request.accuracyMetres(), request.simulated());
     }
 
-    @GetMapping("/tracking/live")
-    public List<AgentService.LivePosition> live() {
-        return agents.livePositions();
-    }
-
-    @PostMapping("/agents/{agentId}/simulate-route")
-    public Map<String, Object> simulate(@PathVariable Long agentId, @RequestBody SimulateRequest r) {
-        int steps = r.steps() == null ? 40 : r.steps();
-        int seconds = r.secondsPerStep() == null ? 5 : r.secondsPerStep();
-        int created = agents.simulateRoute(agentId, r.fromLat(), r.fromLon(), r.toLat(), r.toLon(), steps, seconds);
-        return Map.of("pingsCreated", created);
-    }
-
     @PostMapping("/orders")
     public OrderService.OrderView createOrder(@RequestBody CreateOrderRequest r) {
         return orders.create(r.customerId(), r.cylinderCount() == null ? 1 : r.cylinderCount());
@@ -106,19 +91,9 @@ public class ApiController {
         return orders.openOrders(branchId);
     }
 
-    @GetMapping("/orders/{orderId}/suggest-agents")
-    public List<AssignmentRanker.Ranked> suggestAgents(@PathVariable Long orderId) {
-        return orders.suggestAgents(orderId);
-    }
-
     @PostMapping("/orders/{orderId}/assign/{agentId}")
     public OrderService.OrderView assign(@PathVariable Long orderId, @PathVariable Long agentId) {
         return orders.assign(orderId, agentId);
-    }
-
-    @PostMapping("/orders/{orderId}/auto-assign")
-    public OrderService.OrderView autoAssign(@PathVariable Long orderId) {
-        return orders.autoAssign(orderId);
     }
 
     @PostMapping("/orders/{orderId}/refresh-eta")
@@ -161,22 +136,34 @@ public class ApiController {
         return assistant.dashboard();
     }
 
+    @GetMapping("/customers")
+    public List<Map<String, Object>> customers() {
+        return assistant.customerList();
+    }
+
+    @GetMapping("/agents")
+    public List<Map<String, Object>> agents() {
+        return assistant.agentList();
+    }
+
+    @GetMapping("/areas")
+    public List<Map<String, Object>> areas() {
+        return assistant.areaList();
+    }
+
+    @PostMapping("/intake/preview")
+    public IntakeService.Preview previewIntake(@RequestBody IntakeRequest r) {
+        return intake.preview(r.text());
+    }
+
+    @PostMapping("/intake/import")
+    public IntakeService.ImportResult importIntake(@RequestBody IntakeRequest r) {
+        return intake.importOrders(r.text());
+    }
+
     @PostMapping("/demo/reset")
     public Map<String, Object> demoReset() {
         return demo.reset();
-    }
-
-    @PostMapping("/demo/drive")
-    public Map<String, Object> demoDrive(@RequestBody DriveRequest r) {
-        if (demo.isDriving()) {
-            return Map.of("status", "already-driving");
-        }
-        demo.drive(r.agentId() == null ? 4L : r.agentId(),
-                   r.toLat() == null ? 17.3712 : r.toLat(),
-                   r.toLon() == null ? 78.5580 : r.toLon(),
-                   r.steps() == null ? 30 : r.steps(),
-                   r.secondsPerStep() == null ? 3 : r.secondsPerStep());
-        return Map.of("status", "driving");
     }
 
     @GetMapping("/demo/health")

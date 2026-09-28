@@ -13,7 +13,7 @@ variable first, as blocks A and E do, or the pipe yields one empty row.
    - seededOrders 162, deliveryProofs 162, quietCustomers 12, groqKeySet true
 4. Reset: POST `http://localhost:8081/api/demo/reset`
    - note the `waitingOrderId` it returns — you need it in step 5
-5. Open three tabs: dashboard `/`, order board `/board.html`, live map `/map.html`
+5. Open two tabs: dashboard `/`, control console `/control.html`
 6. Start on the dashboard tab
 
 ## The five minutes
@@ -23,7 +23,7 @@ variable first, as blocks A and E do, or the pipe yields one empty row.
 The one number I'd act on today is here —" point at Mahesh Babu's late check-ins.
 "He's been late 16 times. Nobody else is late at all."
 
-### 2. Attendance (45 s) — tab: map
+### 2. Attendance (45 s)
 "Agents used to sign a paper register. Now check-in only works at the branch."
 
 Run from PowerShell, from home coordinates:
@@ -38,26 +38,20 @@ Invoke-RestMethod -Method Post -Uri http://localhost:8081/api/agents/3/check-in 
 ```
 "Accepted. And every attempt is logged, including the refused one."
 
-### 3. Assignment and ETA (60 s) — tab: order board
-Click **Auto-assign** on the DEMO- order (Priya Sharma).
-"It didn't just pick the nearest agent — it weighed distance against how many
-orders each already has."
+### 3. Assignment and ETA (60 s) — tab: control console
+Hand the waiting DEMO- order (Priya Sharma) to Ravi, the agent who just checked in:
+```powershell
+$all = Invoke-RestMethod http://localhost:8081/api/orders
+$id = ($all | Where-Object { $_.orderNo -like 'DEMO-*' } | Select-Object -First 1).id
+Invoke-RestMethod -Method Post -Uri "http://localhost:8081/api/orders/$id/assign/3" | Format-List
+```
 
-Note who it assigned: that agent does the drive and the delivery. It should be
-Suresh, who is carrying fewer orders than Ravi.
+Point at the ETA it comes back with: "Google would tell us the drive takes X
+minutes. This says X plus 15 — because Priya is on the 5th floor of a gated
+building and there are two cylinders to carry. That's the time that actually
+makes deliveries late, and no maps API knows it."
 
-Point at the ETA: "Google would tell us the drive takes X minutes. This says
-X plus 15 — because Priya is on the 5th floor of a gated building and there are
-two cylinders to carry. That's the time that actually makes deliveries late,
-and no maps API knows it."
-
-### 4. Live tracking (60 s) — tab: map
-Click **Drive Suresh to the customer**. Talk while it moves.
-"Position every 30 seconds, only between check-in and check-out — we don't
-track anyone off duty. Speed is calculated here; anything above 150 km/h
-gets flagged as impossible."
-
-### 5. Delivery proof (60 s)
+### 4. Delivery proof (60 s)
 "The customer reads out a 4-digit code." One block at a time.
 
 **A — pick up the order and the agent it went to**
@@ -96,7 +90,7 @@ $flagged | Select-Object -First 3 orderId, agentId, @{n='metresAway';e={[math]::
 ```
 "Right code, but 2 to 3 km from the address. That is the case worth a phone call."
 
-### 6. The AI (75 s) — tab: dashboard
+### 5. The AI (75 s) — tab: dashboard
 Click **Who was late most this month?**
 "Mahesh Babu, 16 late check-ins." Point at the `queried:` line.
 "That's the important part — it ran a real query. The model can't write SQL
@@ -109,13 +103,11 @@ Anil Verma is 75 days quiet when he normally orders every 30 — and he had
 
 ## Closing line
 "Everything you saw runs on one Spring Boot service and one Postgres database.
-The business rules are plain Java with 48 tests behind them. Next steps are
+The business rules are plain Java with 40 tests behind them. Next steps are
 route planning across multiple stops, WhatsApp booking, and stock settlement."
 
 ## If something breaks
 - Assistant errors → GROQ_API_KEY not set in this terminal
-- Map empty → nobody checked in today, run the reset
-- Drive does nothing → the driving agent must be on duty; the reset puts Suresh on duty
-- Delivery says NOT_ASSIGNED_AGENT → block A picked the wrong order, or auto-assign chose Ravi; use the agent id block A printed
+- Delivery says NOT_ASSIGNED_AGENT → block A picked the wrong order; use the agent id block A printed
 - Port 8081 busy → `Get-NetTCPConnection -LocalPort 8081 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }`
 - Anything unexplained → reset and carry on; never debug live
