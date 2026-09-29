@@ -119,13 +119,7 @@ public class AssistantService {
                 JsonNode toolCalls = message.get("tool_calls");
 
                 if (toolCalls == null || !toolCalls.isArray() || toolCalls.isEmpty()) {
-                    String text = message.path("content").asText("")
-                            .replace('\u00A0', ' ')      // non-breaking space
-                            .replace('\u202F', ' ')      // narrow no-break space
-                            .replace('\u2011', '-')      // non-breaking hyphen
-                            .replace('\u2014', '-')      // em dash
-                            .replace('\u2013', '-')      // en dash
-                            .replace('\u2019', '\'');    // curly apostrophe
+                    String text = plain(message.path("content").asText(""));
                     return new Answer(text, used, System.currentTimeMillis() - started);
                 }
 
@@ -158,6 +152,17 @@ public class AssistantService {
         }
     }
 
+    /** Swaps typographic characters the dashboard font may show as boxes for plain ones. */
+    private static String plain(String text) {
+        return text
+                .replace('\u00A0', ' ')      // non-breaking space
+                .replace('\u202F', ' ')      // narrow no-break space
+                .replace('\u2011', '-')      // non-breaking hyphen
+                .replace('\u2014', '-')      // em dash
+                .replace('\u2013', '-')      // en dash
+                .replace('\u2019', '\'');    // curly apostrophe
+    }
+
     private Object run(String name, JsonNode args) {
         return switch (name) {
             case "agentPunctuality" -> agentPunctuality(args.path("days").asInt(7));
@@ -170,14 +175,45 @@ public class AssistantService {
         };
     }
 
+    /**
+     * Writes text from facts supplied in the instruction, with no tools. The plan summary
+     * uses this: with tools offered, the model goes looking in the database instead of
+     * using the facts it was given, and can answer that it has no data.
+     */
+    public String write(String instruction) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("GROQ_API_KEY is not set");
+        }
+        List<Map<String, Object>> messages = List.of(
+                Map.of("role", "system", "content", """
+                        You write short operational summaries for a gas cylinder delivery business
+                        in Hyderabad, India. Use only the facts in the request. Plain sentences, no
+                        markdown, no asterisks, no headings.
+                        """),
+                Map.of("role", "user", "content", instruction));
+        try {
+            return plain(callGroq(messages, false).path("content").asText(""));
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException("The assistant is unavailable: " + e.getMessage());
+        }
+    }
+
     private JsonNode callGroq(List<Map<String, Object>> messages) throws Exception {
-        Map<String, Object> body = Map.of(
-                "model", model,
-                "messages", messages,
-                "tools", TOOLS,
-                "tool_choice", "auto",
-                "temperature", 0.2,
-                "max_tokens", 900);
+        return callGroq(messages, true);
+    }
+
+    private JsonNode callGroq(List<Map<String, Object>> messages, boolean withTools) throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", model);
+        body.put("messages", messages);
+        if (withTools) {
+            body.put("tools", TOOLS);
+            body.put("tool_choice", "auto");
+        }
+        body.put("temperature", 0.2);
+        body.put("max_tokens", 900);
 
         HttpResponse<String> res = http.send(
                 HttpRequest.newBuilder(URI.create(URL))

@@ -3,402 +3,601 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DropPoint — Operations & Multi-Role Portal</title>
+<title>Operations · DropPoint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="/app.css">
 <style>
-  :root {
-    --ink: #1c2733;
-    --soft: #5a6875;
-    --rule: #dde3e9;
-    --paper: #f6f8fa;
-    --blue: #1f6e8c;
-    --green: #1e6b47;
-    --amber: #9a6a00;
-    --red: #b3261e;
+  /* ---------- shell ---------- */
+  .shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+
+  .sidebar {
+    position: sticky; top: 0; height: 100vh;
+    display: flex; flex-direction: column;
+    background: var(--night); color: #cbd5e1;
+    border-right: 1px solid rgba(255,255,255,0.06);
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: system-ui, -apple-system, sans-serif;
-    background: var(--paper);
-    color: var(--ink);
-    line-height: 1.55;
+  .side-brand { display: flex; align-items: center; gap: 10px; padding: 20px 20px 18px; }
+  .side-brand .mark {
+    width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center;
+    background: linear-gradient(135deg, #3b82f6, #6366f1); box-shadow: 0 6px 18px rgba(59,130,246,0.35);
   }
-  header {
-    background: #fff;
-    border-bottom: 1px solid var(--rule);
-    padding: 12px 22px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  .side-brand .mark svg { width: 18px; height: 18px; fill: #fff; }
+  .side-brand span { font-weight: 700; font-size: 1.05rem; color: #fff; letter-spacing: -0.01em; }
+
+  .side-nav { flex: 1; overflow-y: auto; padding: 6px 12px; }
+  .side-group { margin-bottom: 14px; }
+  .side-label { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; padding: 8px 10px 6px; }
+  .side-nav a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; margin-bottom: 2px; border-radius: 8px;
+    color: #cbd5e1; text-decoration: none; font-weight: 500; font-size: 0.88rem;
+    transition: background 0.15s, color 0.15s;
   }
-  header h1 { font-size: 1.25rem; margin: 0; color: var(--ink); display: flex; align-items: center; gap: 8px; }
-  header nav { display: flex; align-items: center; gap: 14px; }
-  header nav a { color: var(--blue); text-decoration: none; font-size: 0.92rem; font-weight: 500; }
-  header nav a:hover { text-decoration: underline; }
-  
-  .user-badge {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--paper);
-    border: 1px solid var(--rule);
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 0.85rem;
+  .side-nav a svg { width: 17px; height: 17px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
+  .side-nav a:hover { background: rgba(255,255,255,0.06); color: #fff; }
+  .side-nav a.active { background: rgba(59,130,246,0.16); color: #fff; }
+  .side-nav a.active svg { color: #93c5fd; opacity: 1; }
+  .nav-badge {
+    margin-left: auto; min-width: 20px; padding: 0 6px; height: 20px; border-radius: 999px;
+    background: var(--danger); color: #fff; font-size: 0.7rem; font-weight: 700;
+    display: none; align-items: center; justify-content: center;
   }
-  .role-pill {
-    display: inline-block;
-    font-size: 0.7rem;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+  .nav-badge.show { display: inline-flex; }
+
+  .side-user { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.07); }
+  .side-user .who { min-width: 0; flex: 1; }
+  #userInfo { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+  #userName { color: #fff; font-weight: 600; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+  .icon-btn {
+    width: 34px; height: 34px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
+    background: transparent; color: #94a3b8; display: grid; place-items: center; cursor: pointer; padding: 0; margin: 0;
   }
-  .role-ADMIN { background: #e3f2fd; color: #0d47a1; border: 1px solid #90caf9; }
-  .role-OWNER { background: #f3e5f5; color: #4a148c; border: 1px solid #ce93d8; }
-  .role-MANAGER { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
-  .role-AGENT { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
-  
-  .wrap { max-width: 1050px; margin: 0 auto; padding: 26px 20px 70px; }
-  
-  .section-desc { color: var(--soft); margin: 0 0 16px; font-size: 0.93rem; }
-  
+  .icon-btn:hover { color: #fff; background: rgba(255,255,255,0.06); }
+  .icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  .main { min-width: 0; display: flex; flex-direction: column; }
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 16px 32px; background: rgba(244,246,250,0.85); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .crumb { font-size: 0.76rem; color: var(--muted); font-weight: 500; }
+  .topbar h1 { margin: 2px 0 0; font-size: 1.3rem; letter-spacing: -0.02em; font-weight: 700; }
+  .topbar-actions { display: flex; align-items: center; gap: 10px; }
+  .today-chip { font-size: 0.8rem; color: var(--ink-2); background: var(--surface); border: 1px solid var(--line); padding: 6px 12px; border-radius: 999px; font-weight: 500; }
+  .btn-link {
+    display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+    padding: 8px 14px; border-radius: 9px; font-weight: 600; font-size: 0.86rem;
+    background: var(--ink); color: #fff; box-shadow: var(--shadow-sm);
+  }
+  .btn-link:hover { background: #1e293b; }
+  .btn-link svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  .wrap { width: 100%; max-width: 1180px; margin: 0 auto; padding: 28px 32px 80px; }
+
+  /* ---------- section cards ---------- */
   .box {
-    background: #fff;
-    border: 1px solid var(--rule);
-    border-radius: 11px;
-    padding: 22px;
-    margin-bottom: 24px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
+    padding: 24px; margin-bottom: 24px; box-shadow: var(--shadow-sm);
+    scroll-margin-top: 90px;
   }
-  
-  h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--soft); margin: 0 0 14px; }
-  
+  .box-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .box-head .title { display: flex; gap: 12px; align-items: flex-start; }
+  .box-icon { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; background: var(--brand-50); color: var(--brand); }
+  .box-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .box-icon.red { background: var(--danger-50); color: var(--danger); }
+  .box-icon.green { background: var(--success-50); color: var(--success); }
+  .box-icon.purple { background: #f3e8ff; color: #7e22ce; }
+  h2 { font-size: 1.05rem; font-weight: 650; letter-spacing: -0.01em; margin: 0; color: var(--ink); }
+  .section-desc { color: var(--muted); margin: 3px 0 0; font-size: 0.86rem; max-width: 640px; }
+  .subhead { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 22px 0 10px; }
+  .divider-line { height: 1px; background: var(--line); margin: 24px -24px; }
+
+  /* ---------- buttons ---------- */
   button {
-    padding: 8px 15px;
-    margin: 0 6px 6px 0;
-    border: 0;
-    border-radius: 8px;
-    background: var(--blue);
-    color: #fff;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 15px; margin: 0 8px 8px 0;
+    font: inherit; font-size: 0.86rem; font-weight: 600; line-height: 1.2;
+    color: #fff; background: var(--brand); border: 1px solid transparent; border-radius: 9px;
+    cursor: pointer; box-shadow: 0 1px 2px rgba(15,23,42,0.08);
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.05s;
   }
-  button.go { background: var(--green); }
-  button.grey { background: #fff; border: 1px solid var(--rule); color: var(--ink); }
-  button.danger { background: #fff; border: 1px solid #f8c4c1; color: var(--red); }
-  button.sm { padding: 5px 10px; font-size: 0.82rem; border-radius: 6px; margin-bottom: 0; }
-  button:disabled { opacity: 0.45; cursor: default; }
-  
-  /* TABLE RESPONSIVE & PADDING FIX */
-  .table-responsive {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    border: 1px solid var(--rule);
-    border-radius: 8px;
-    margin-bottom: 12px;
-  }
-  table { width: 100%; min-width: 800px; border-collapse: collapse; font-size: 0.88rem; }
-  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: middle; white-space: nowrap; }
-  th { font-size: 0.74rem; color: var(--soft); text-transform: uppercase; letter-spacing: 0.04em; background: var(--paper); }
-  tr:last-child td { border-bottom: none; }
-  
+  button:hover { background: var(--brand-600); }
+  button:active { transform: translateY(1px); }
+  button:focus-visible { outline: none; box-shadow: var(--ring); }
+  button.go { background: var(--success); }
+  button.go:hover { background: #166534; }
+  button.grey { background: var(--surface); color: var(--ink-2); border-color: var(--line-strong); }
+  button.grey:hover { background: var(--surface-2); }
+  button.danger { background: var(--surface); color: var(--danger); border-color: #f5c2c2; box-shadow: none; }
+  button.danger:hover { background: var(--danger-50); }
+  button.sm { padding: 6px 11px; font-size: 0.8rem; border-radius: 8px; margin-bottom: 0; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---------- forms ---------- */
   input[type=text], input[type=number], input[type=date], input[type=password], textarea, select {
-    padding: 6px 9px;
-    border: 1px solid var(--rule);
-    border-radius: 7px;
-    font-size: 0.88rem;
-    color: var(--ink);
-    background: #fff;
+    font: inherit; font-size: 0.86rem; color: var(--ink);
+    padding: 7px 10px; background: #fff; border: 1px solid var(--line-strong); border-radius: 8px;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
-  table input[type=text] { width: 100%; min-width: 110px; max-width: 140px; }
-  table input[type=number] { width: 60px; }
-  table select { width: 100%; min-width: 110px; max-width: 140px; }
-  input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; }
-  textarea { width: 100%; min-height: 100px; font-family: monospace; font-size: 0.88rem; resize: vertical; }
-  
-  .agentcard { border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
-  .agentcard h3 { margin: 0 0 4px; font-size: 1.02rem; display: flex; align-items: center; justify-content: space-between; }
-  .load { font-size: 0.83rem; color: var(--soft); font-weight: normal; }
-  .bar { height: 6px; background: var(--paper); border-radius: 99px; margin: 8px 0 12px; overflow: hidden; }
-  .bar i { display: block; height: 100%; background: var(--blue); }
-  .bar i.full { background: var(--amber); }
-  .bar i.success { background: var(--green); }
-  
-  .arealine {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 7px 0;
-    border-top: 1px dashed var(--rule);
-    font-size: 0.9rem;
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--brand); box-shadow: var(--ring); }
+  input:disabled { background: var(--surface-2); color: var(--ink-2); border-color: var(--line); }
+  input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--brand); cursor: pointer; }
+  select[multiple] { padding: 4px; }
+  select[multiple] option { padding: 3px 6px; border-radius: 4px; }
+  select[multiple] option:checked { background: var(--brand-100); color: var(--ink); }
+  textarea {
+    width: 100%; min-height: 150px; resize: vertical; line-height: 1.6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.82rem;
+    background: var(--surface-2); padding: 12px 14px;
   }
-  .arealine b { min-width: 140px; }
-  .arealine span { color: var(--soft); flex: 1; }
-  .tag { font-size: 0.73rem; background: var(--paper); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 8px; color: var(--soft); display: inline-block; }
-  
-  .summary { background: #eef5f8; border-left: 4px solid var(--blue); padding: 13px 16px; border-radius: 0 8px 8px 0; margin-bottom: 16px; white-space: pre-wrap; font-size: 0.93rem; }
-  .warn { background: #fdf4e3; border-left-color: var(--amber); }
-  .stats { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 14px; }
-  .stats b { font-size: 1.5rem; display: block; }
-  .stats span { color: var(--soft); font-size: 0.82rem; }
-  
-  .badge-assigned { font-weight: 600; color: var(--blue); }
-  .msg-banner { margin-top: 10px; font-size: 0.9rem; color: var(--soft); }
-  
-  .flex-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
-  .flex-header h2 { margin: 0; }
+  table input[type=text] { width: 100%; min-width: 110px; max-width: 160px; }
+  table input[type=number] { width: 70px; }
+  table select { width: 100%; min-width: 120px; max-width: 170px; }
 
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-  @keyframes flash-sos {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-  }
+  /* ---------- tables ---------- */
+  .table-responsive { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+  table { width: 100%; min-width: 800px; border-collapse: collapse; font-size: 0.86rem; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+  th { font-size: 0.7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; background: var(--surface-2); }
+  tbody tr:hover td { background: #fafbfd; }
+  tbody tr:last-child td { border-bottom: none; }
+  tfoot td { background: var(--surface-2); border-top: 1px solid var(--line); border-bottom: none; }
+  .hint-text { font-size: 0.7rem; color: var(--faint); margin-top: 3px; }
 
+  /* ---------- stats ---------- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stats > div { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .stats b { display: block; font-size: 1.55rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; font-variant-numeric: tabular-nums; }
+  .stats span { display: block; color: var(--muted); font-size: 0.78rem; font-weight: 500; margin-top: 2px; }
+
+  /* ---------- progress panel ---------- */
+  .progress-panel { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+  .panel-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .panel-title { font-weight: 600; font-size: 0.92rem; display: flex; align-items: center; gap: 8px; }
+  .today-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px rgba(21,128,61,0.15); }
+  .agent-progress { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  .ap-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .ap-top { display: flex; align-items: center; gap: 10px; }
+  .ap-top .avatar { width: 28px; height: 28px; font-size: 0.7rem; }
+  .ap-name { font-weight: 600; font-size: 0.88rem; }
+  .ap-meta { font-size: 0.76rem; color: var(--muted); }
+  .ap-pct { margin-left: auto; font-weight: 700; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+
+  .bar { height: 6px; background: #e9edf3; border-radius: 99px; margin: 10px 0 4px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--brand); border-radius: 99px; transition: width 0.4s ease; }
+  .bar i.full { background: var(--warning); }
+  .bar i.success { background: var(--success); }
+
+  /* ---------- plan ---------- */
+  .summary {
+    display: flex; gap: 12px; align-items: flex-start;
+    background: linear-gradient(135deg, #eef4ff, #f5f3ff); border: 1px solid #dbe4fb;
+    padding: 14px 16px; border-radius: var(--radius); margin-bottom: 16px; white-space: pre-wrap; font-size: 0.9rem; color: var(--ink-2);
+  }
+  .summary::before {
+    content: "AI"; flex-shrink: 0; font-size: 0.66rem; font-weight: 700; color: #fff; letter-spacing: 0.04em;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6); border-radius: 6px; padding: 3px 6px; margin-top: 1px;
+  }
+  .summary.warn { background: var(--warning-50); border-color: #f6dfb5; display: block; }
+  .summary.warn::before { display: none; }
+  .agentcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+  .agentcard { border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; background: var(--surface); }
+  .agentcard h3 { margin: 0; font-size: 0.95rem; font-weight: 600; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .load { font-size: 0.78rem; color: var(--muted); font-weight: 500; }
+  .arealine { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 0.86rem; flex-wrap: wrap; }
+  .arealine b { min-width: 120px; font-weight: 600; }
+  .arealine > span { color: var(--muted); flex: 1; }
+  .arealine select { font-size: 0.78rem; padding: 5px 8px; }
+  .plan-actions { display: flex; flex-wrap: wrap; align-items: center; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .empty { text-align: center; color: var(--muted); padding: 28px 16px; font-size: 0.88rem; border: 1px dashed var(--line-strong); border-radius: var(--radius); background: var(--surface-2); }
+
+  .badge-assigned { font-weight: 700; color: var(--brand); font-variant-numeric: tabular-nums; }
+  .msg-banner { margin-top: 10px; font-size: 0.86rem; color: var(--muted); }
+  .msg-banner:empty { display: none; }
+  .flex-header { display: flex; align-items: center; gap: 10px; }
+  .flex-header label { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+
+  /* ---------- intake ---------- */
+  .intake-toolbar { display: flex; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  .intake-toolbar .spacer { flex: 1; }
+  .format-hint { font-size: 0.78rem; color: var(--muted); margin-bottom: 8px; }
+  .format-hint code { font-size: 0.74rem; }
+
+  /* ---------- SOS ---------- */
+  #sosCount { background: var(--danger-50); color: var(--danger); border-color: #f5c2c2; font-weight: 600; }
+  .sos-banner {
+    display: none;
+    background: var(--danger); color: #fff; padding: 12px 16px; border-radius: var(--radius); margin-bottom: 14px; font-weight: 600;
+    animation: flash-sos 1.2s ease-in-out infinite;
+  }
+  @keyframes flash-sos { 0%, 100% { opacity: 1; } 50% { opacity: 0.75; } }
   .sos-card {
-    background: #fff;
-    border: 2px solid var(--red);
-    border-radius: 10px;
-    padding: 16px;
-    margin-bottom: 10px;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center;
+    background: var(--surface); border: 1px solid #f5c2c2; border-left: 4px solid var(--danger);
+    border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px;
   }
-  .sos-card .sos-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
+  .sos-card::before {
+    content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--danger);
+    box-shadow: 0 0 0 0 rgba(220,38,38,0.6); animation: sos-ping 1.4s infinite;
   }
-  .sos-card .sos-agent {
-    font-weight: 700;
-    font-size: 1rem;
-  }
-  .sos-card .sos-time {
-    color: var(--soft);
-    font-size: 0.82rem;
-  }
-  .sos-card .sos-details {
-    font-size: 0.88rem;
-    color: var(--soft);
-    margin-bottom: 10px;
+  @keyframes sos-ping { 70% { box-shadow: 0 0 0 10px rgba(220,38,38,0); } 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); } }
+  .sos-header { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .sos-agent { font-weight: 700; }
+  .sos-time { color: var(--muted); font-size: 0.8rem; }
+  .sos-details { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+  .sos-card button { margin: 0; }
+  #sosEmpty svg { vertical-align: -4px; margin-right: 6px; }
+  #sosEmpty svg { width: 18px; height: 18px; display: inline-block; stroke: var(--success); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---------- GPS modal ---------- */
+  .modal-overlay { position: fixed; inset: 0; z-index: 2000; align-items: center; justify-content: center; background: rgba(15,23,42,0.5); backdrop-filter: blur(3px); padding: 16px; }
+  .modal { background: var(--surface); border-radius: var(--radius-lg); width: 100%; max-width: 680px; padding: 20px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 12px; }
+  .modal-head { display: flex; justify-content: space-between; align-items: center; }
+  .modal-head h3 { margin: 0; font-size: 1.02rem; }
+  .modal-head button { margin: 0; }
+  #gpsModalStatus { font-size: 0.85rem; color: var(--muted); }
+  #gpsModalMap { height: 400px; border-radius: var(--radius); border: 1px solid var(--line); }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 960px) {
+    .shell { grid-template-columns: minmax(0, 1fr); }
+    .sidebar { position: sticky; top: 0; z-index: 60; height: auto; min-width: 0; flex-direction: row; align-items: center; flex-wrap: wrap; }
+    .side-brand { padding: 12px 16px; }
+    .side-nav { order: 3; flex: 0 0 100%; min-width: 0; display: flex; gap: 4px; overflow-x: auto; padding: 0 12px 10px; scrollbar-width: none; }
+    .topbar { flex-wrap: wrap; }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stats b { font-size: 1.3rem; }
+    .box-head .flex-header { width: 100%; }
+    .side-group { display: contents; }
+    .side-label { display: none; }
+    .side-nav a { white-space: nowrap; margin: 0; }
+    .side-user { margin-left: auto; border-top: none; padding: 10px 16px; }
+    .side-user .who { display: none; }
+    .topbar { position: static; padding: 16px; }
+    .today-chip { display: none; }
+    .wrap { padding: 16px 16px 60px; }
+    .box { padding: 18px; }
+    .divider-line { margin: 20px -18px; }
+    .agentcards { grid-template-columns: 1fr; }
+    .sos-card { grid-template-columns: auto 1fr; }
+    .sos-card button { grid-column: 1 / -1; }
   }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>📍 DropPoint</h1>
-  <nav>
-    <div id="userInfo" class="user-badge">
-      <span id="userName">User</span>
-      <span id="userRole" class="role-pill">ROLE</span>
-    </div>
-    <button class="grey sm" onclick="logout()">Sign Out</button>
-    <a href="/assistant.html">Ask Assistant 💬</a>
-  </nav>
-</header>
+<div class="shell">
 
-<div class="wrap">
-
-  <!-- ADMIN USER MANAGEMENT SECTION (ADMIN ONLY) -->
-  <div class="box" id="adminUserSection" style="display:none;">
-    <h2>👑 System User Management (Admin Only)</h2>
-    <p class="section-desc">Manage agency users, update logins, and assign system access roles (<b>ADMIN</b>, <b>OWNER</b>, <b>MANAGER</b>, <b>AGENT</b>).</p>
-    <div class="table-responsive">
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>System Role</th>
-            <th>Login PIN</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="userRows">
-          <tr><td colspan="5">Loading users…</td></tr>
-        </tbody>
-        <tfoot>
-          <tr style="background: var(--paper);">
-            <td><input type="text" id="newUserName" placeholder="Full name"></td>
-            <td><input type="text" id="newUserPhone" placeholder="Phone number"></td>
-            <td>
-              <select id="newUserRole">
-                <option value="AGENT">AGENT</option>
-                <option value="MANAGER">MANAGER</option>
-                <option value="OWNER">OWNER</option>
-                <option value="ADMIN">ADMIN</option>
-              </select>
-            </td>
-            <td><input type="text" id="newUserPin" value="1234" style="width:70px;"></td>
-            <td><button class="go sm" onclick="createUser()">+ Add User</button></td>
-          </tr>
-        </tfoot>
-      </table>
+  <!-- ---------- sidebar ---------- -->
+  <aside class="sidebar">
+    <div class="side-brand">
+      <div class="mark"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+      <span>DropPoint</span>
     </div>
-    <div id="userMsg" class="msg-banner"></div>
-  </div>
 
-  <!-- SECTION 1: AGENTS & REGULAR AREAS (ADMIN, MANAGER, OWNER) -->
-  <div class="box" id="agentsSection" style="display:none;">
-    <h2>1 · Agents & Regular Delivery Locations</h2>
-    <p class="section-desc">Manage agents, toggle in-today availability, and assign <b>Regular Delivery Locations</b> so the day plan automatically prioritizes their designated sectors.</p>
-    
-    <div class="table-responsive">
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Daily Limit</th>
-            <th>Regular Delivery Locations</th>
-            <th>In Today</th>
-            <th>Live GPS</th>
-            <th>Assigned Today</th>
-            <th id="thActions">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="agentRows">
-          <tr><td colspan="8">Loading agents…</td></tr>
-        </tbody>
-        <tfoot id="tfootAddAgent">
-          <tr style="background: var(--paper);">
-            <td><input type="text" id="newName" placeholder="Full name"></td>
-            <td><input type="text" id="newPhone" placeholder="Phone number"></td>
-            <td><input type="number" id="newCap" value="40" min="1" max="200"></td>
-            <td>
-              <select id="newPrefAreas" multiple style="height:55px; font-size:0.82rem;" title="Hold Ctrl to select multiple">
-                <option value="">select areas…</option>
-              </select>
-              <div style="font-size:0.7rem; color:var(--soft);">Ctrl+click for multiple</div>
-            </td>
-            <td colspan="3"><span style="color:var(--soft); font-size:0.83rem;">New agent default</span></td>
-            <td><button class="go sm" onclick="addAgent()">+ Add Agent</button></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-    <div id="agentMsg" class="msg-banner"></div>
-  </div>
+    <nav class="side-nav" id="sideNav">
+      <div class="side-group">
+        <div class="side-label">Operations</div>
+        <a href="#planSection" data-section="planSection">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+          Today
+        </a>
+        <a href="#intakeSection" data-section="intakeSection">
+          <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+          Orders
+        </a>
+        <a href="#agentsSection" data-section="agentsSection">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Agents
+        </a>
+        <a href="#sosSection" data-section="sosSection">
+          <svg viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+          SOS alerts
+          <span class="nav-badge" id="navSosCount"></span>
+        </a>
+      </div>
+      <div class="side-group">
+        <div class="side-label">Administration</div>
+        <a href="#adminUserSection" data-section="adminUserSection">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Users &amp; access
+        </a>
+      </div>
+      <div class="side-group">
+        <div class="side-label">Insights</div>
+        <a href="/assistant.html">
+          <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          AI assistant
+        </a>
+      </div>
+    </nav>
 
-  <!-- SECTION 2: TODAY'S ORDERS (ADMIN, MANAGER) -->
-  <div class="box" id="intakeSection" style="display:none;">
-    <h2>2 · Today's Orders</h2>
-    <p class="section-desc">Paste WhatsApp order logs or upload a text file. Preview the parsed orders before importing into the waiting pile.</p>
-    <div>
-      <textarea id="intakeText" placeholder="One order per line: Phone, Name, Area, Address, Cylinders, Type
-e.g. 9876543210, Ramesh Kumar, Kothapet, H.No 8-12 Sri Ram Nagar, 2, DOMESTIC
-(no commas inside the address)"></textarea>
+    <div class="side-user">
+      <span class="avatar" id="userAvatar">?</span>
+      <div class="who">
+        <div id="userInfo">
+          <span id="userName">User</span>
+          <span id="userRole" class="role-pill">ROLE</span>
+        </div>
+      </div>
+      <button class="icon-btn" onclick="logout()" title="Sign out" aria-label="Sign out">
+        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+      </button>
     </div>
-    <div style="margin-top:10px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-      <button onclick="previewOrders()">Preview Orders</button>
-      <button class="go" id="importBtn" onclick="importOrders()" disabled>Import to Waiting Pile</button>
-      <input type="file" id="fileInput" accept=".txt,.csv,.json" style="display:none" onchange="handleFileSelect(event)">
-      <button class="grey" onclick="document.getElementById('fileInput').click()">Upload File</button>
-    </div>
-    <div id="intakePreview" style="margin-top:14px"></div>
-    <div id="intakeMsg" class="msg-banner"></div>
-  </div>
+  </aside>
 
-  <!-- SECTION 3: THE PLAN & HISTORICAL PROGRESS (ADMIN, MANAGER, OWNER) -->
-  <div class="box" id="planSection" style="display:none;">
-    <div class="flex-header">
-      <h2>3 · Plan & Historical Progress</h2>
+  <!-- ---------- main ---------- -->
+  <div class="main">
+    <header class="topbar">
       <div>
-        <label style="font-size:0.85rem; color:var(--soft); margin-right:6px; font-weight:500;">Progress Date:</label>
-        <input type="date" id="progressDate" onchange="loadProgress(this.value)">
+        <div class="crumb">Operations dashboard</div>
+        <h1 id="pageGreeting">Welcome</h1>
       </div>
-    </div>
-    <p class="section-desc">Review delivery completion rates for any date, or generate and confirm today's area allocation plan.</p>
-    
-    <!-- Historical Progress Block -->
-    <div id="progressReportBlock" style="margin-bottom:20px;"></div>
+      <div class="topbar-actions">
+        <span class="today-chip" id="todayLabel"></span>
+        <a class="btn-link" href="/assistant.html">
+          <svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
+          Ask Assistant
+        </a>
+      </div>
+    </header>
 
-    <div id="planControlsBlock">
-      <div class="stats" id="stats"></div>
-      <div id="summary"></div>
-      <div id="planContent"></div>
-      <div style="margin-top:16px" id="planButtons">
-        <button onclick="makePlan()">Plan the day</button>
-        <button class="go" id="confirmBtn" onclick="confirmPlan()" disabled>Confirm and Assign</button>
-        <button class="grey" onclick="reopenPlan()">Reopen</button>
+    <div class="wrap">
+
+      <!-- TODAY: PROGRESS AND PLAN (ADMIN, MANAGER, OWNER) -->
+      <section class="box" id="planSection" style="display:none;">
+        <div class="box-head">
+          <div class="title">
+            <span class="box-icon"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></span>
+            <div>
+              <h2>Today at a glance</h2>
+              <p class="section-desc">Delivery progress for any date, and today's plan: which agent covers which area.</p>
+            </div>
+          </div>
+          <div class="flex-header">
+            <label for="progressDate">Date</label>
+            <input type="date" id="progressDate" onchange="loadProgress(this.value)">
+          </div>
+        </div>
+
+        <div id="progressReportBlock"></div>
+
+        <div class="divider-line"></div>
+
+        <div id="planControlsBlock">
+          <div class="box-head" style="margin-bottom:14px;">
+            <div class="title">
+              <span class="box-icon purple"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+              <div>
+                <h2>Day plan</h2>
+                <p class="section-desc">Areas are split across available agents within each agent's daily limit. Review, adjust, then confirm to assign.</p>
+              </div>
+            </div>
+          </div>
+          <div class="stats" id="stats"></div>
+          <div id="summary"></div>
+          <div id="planContent"></div>
+          <div class="plan-actions" id="planButtons">
+            <button onclick="makePlan()">
+              <svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
+              Plan the day
+            </button>
+            <button class="go" id="confirmBtn" onclick="confirmPlan()" disabled>
+              <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+              Confirm and Assign
+            </button>
+            <button class="grey" onclick="reopenPlan()">Reopen</button>
+          </div>
+          <div id="planMsg" class="msg-banner"></div>
+        </div>
+      </section>
+
+      <!-- ORDERS INTAKE (ADMIN, MANAGER) -->
+      <section class="box" id="intakeSection" style="display:none;">
+        <div class="box-head">
+          <div class="title">
+            <span class="box-icon"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></span>
+            <div>
+              <h2>Today's orders</h2>
+              <p class="section-desc">Paste order lines or upload a CSV. Preview what was understood before it goes into the waiting pile.</p>
+            </div>
+          </div>
+        </div>
+        <div class="format-hint">One order per line: <code>Phone, Name, Area, Address, Cylinders, Type</code></div>
+        <textarea id="intakeText" placeholder="9876543210, Ramesh Kumar, Kothapet, H.No 8-12 Sri Ram Nagar, 2, DOMESTIC
+9849022222, P. Sunitha Reddy, Dilsukhnagar, Flat 302 Sri Sai Nivas, 1, DOMESTIC
+(no commas inside the address)"></textarea>
+        <div class="intake-toolbar">
+          <input type="file" id="fileInput" accept=".txt,.csv,.json" style="display:none" onchange="handleFileSelect(event)">
+          <button class="grey" onclick="document.getElementById('fileInput').click()">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
+            Upload file
+          </button>
+          <span class="spacer"></span>
+          <button class="grey" onclick="previewOrders()">Preview Orders</button>
+          <button class="go" id="importBtn" onclick="importOrders()" disabled>Import to Waiting Pile</button>
+        </div>
+        <div id="intakePreview" style="margin-top:14px"></div>
+        <div id="intakeMsg" class="msg-banner"></div>
+      </section>
+
+      <!-- AGENTS (ADMIN, MANAGER, OWNER) -->
+      <section class="box" id="agentsSection" style="display:none;">
+        <div class="box-head">
+          <div class="title">
+            <span class="box-icon green"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            <div>
+              <h2>Agents</h2>
+              <p class="section-desc">Daily limits, regular delivery areas and who is in today. The planner keeps each agent on the areas they know.</p>
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Daily limit</th>
+                <th>Regular areas</th>
+                <th>In today</th>
+                <th>Live GPS</th>
+                <th>Assigned</th>
+                <th id="thActions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="agentRows">
+              <tr><td colspan="8">Loading agents…</td></tr>
+            </tbody>
+            <tfoot id="tfootAddAgent">
+              <tr>
+                <td><input type="text" id="newName" placeholder="Full name"></td>
+                <td><input type="text" id="newPhone" placeholder="Phone number"></td>
+                <td><input type="number" id="newCap" value="40" min="1" max="200"></td>
+                <td>
+                  <select id="newPrefAreas" multiple style="height:58px;" title="Hold Ctrl to select multiple">
+                    <option value="">select areas…</option>
+                  </select>
+                  <div class="hint-text">Ctrl+click for multiple</div>
+                </td>
+                <td colspan="3"><span class="hint-text">New agents start available</span></td>
+                <td><button class="go sm" onclick="addAgent()">+ Add agent</button></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div id="agentMsg" class="msg-banner"></div>
+      </section>
+
+      <!-- SOS ALERTS (ADMIN, MANAGER, OWNER) -->
+      <section class="box" id="sosSection" style="display:none;">
+        <div class="box-head">
+          <div class="title">
+            <span class="box-icon red"><svg viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+            <div>
+              <h2>SOS alerts</h2>
+              <p class="section-desc">Emergency alerts from agents in the field. Acknowledge to let the agent know help is on the way.</p>
+            </div>
+          </div>
+          <span id="sosCount" class="tag">0 active</span>
+        </div>
+        <div id="sosBanner" class="sos-banner" style="display:none;">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-4px;margin-right:6px"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+          Emergency: a new SOS alert was received
+        </div>
+        <div id="sosCards"></div>
+        <div id="sosEmpty" class="empty">
+          <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+          All clear. No active alerts.
+        </div>
+      </section>
+
+      <!-- USERS (ADMIN ONLY) -->
+      <section class="box" id="adminUserSection" style="display:none;">
+        <div class="box-head">
+          <div class="title">
+            <span class="box-icon purple"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+            <div>
+              <h2>Users &amp; access</h2>
+              <p class="section-desc">Everyone who can sign in, and what they can see: admin, owner, manager or agent.</p>
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Role</th>
+                <th>PIN</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="userRows">
+              <tr><td colspan="5">Loading users…</td></tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td><input type="text" id="newUserName" placeholder="Full name"></td>
+                <td><input type="text" id="newUserPhone" placeholder="Phone number"></td>
+                <td>
+                  <select id="newUserRole">
+                    <option value="AGENT">AGENT</option>
+                    <option value="MANAGER">MANAGER</option>
+                    <option value="OWNER">OWNER</option>
+                    <option value="ADMIN">ADMIN</option>
+                  </select>
+                </td>
+                <td><input type="text" id="newUserPin" value="1234" style="width:80px;"></td>
+                <td><button class="go sm" onclick="createUser()">+ Add user</button></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div id="userMsg" class="msg-banner"></div>
+      </section>
+
+      <!-- AGENT GPS MODAL -->
+      <div id="gpsModalOverlay" class="modal-overlay" style="display:none;">
+        <div class="modal">
+          <div class="modal-head">
+            <h3 id="gpsModalTitle">Agent Live GPS</h3>
+            <button class="grey sm" onclick="closeAgentGpsModal()">Close</button>
+          </div>
+          <div id="gpsModalStatus">Loading GPS data...</div>
+          <div id="gpsModalMap"></div>
+        </div>
       </div>
-      <div id="planMsg" class="msg-banner"></div>
+
+      <!-- AGENT PORTAL (AGENT ROLE; agents are normally sent to the mobile app) -->
+      <section class="box" id="agentPortalSection" style="display:none;">
+        <div class="box-head">
+          <div class="title">
+            <span class="box-icon"><svg viewBox="0 0 24 24"><rect x="1" y="7" width="14" height="10" rx="1"/><path d="M15 10h4l3 3v4h-7"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>
+            <div>
+              <h2>My route today</h2>
+              <p class="section-desc">Your assigned deliveries. Update each stop as you go.</p>
+            </div>
+          </div>
+        </div>
+        <div id="agentSummaryCard">
+          <div class="stats">
+            <div><b id="myTotalStops">0</b><span>Assigned stops</span></div>
+            <div><b id="myDeliveredStops" style="color:var(--green)">0</b><span>Delivered</span></div>
+            <div><b id="myPendingStops" style="color:var(--amber)">0</b><span>Pending</span></div>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Stop</th>
+                <th>Customer</th>
+                <th>Phone</th>
+                <th>Address / Area</th>
+                <th>Cylinders</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="myOrderRows">
+              <tr><td colspan="7">Loading your assigned orders…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="agentPortalMsg" class="msg-banner"></div>
+      </section>
+
     </div>
   </div>
-
-  <!-- AGENT INDIVIDUAL GPS MODAL -->
-  <div id="gpsModalOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center;">
-    <div style="background:#fff; border-radius:12px; width:90%; max-width:650px; padding:22px; box-shadow:0 10px 25px rgba(0,0,0,0.25); display:flex; flex-direction:column; gap:12px;">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h3 id="gpsModalTitle" style="margin:0; font-size:1.1rem; color:var(--ink);">Agent Live GPS</h3>
-        <button class="grey sm" onclick="closeAgentGpsModal()">Close &times;</button>
-      </div>
-      <div id="gpsModalStatus" style="font-size:0.88rem; color:var(--soft);">Loading GPS data...</div>
-      <div id="gpsModalMap" style="height:380px; border-radius:10px; border:1px solid var(--rule);"></div>
-    </div>
-  </div>
-
-  <!-- SECTION 6: SOS ALERTS (MANAGER, OWNER) -->
-  <div class="box" id="sosSection" style="display:none;">
-    <div class="flex-header">
-      <h2>6 · SOS Emergency Alerts</h2>
-      <span id="sosCount" class="tag" style="background:#ffebee; color:var(--red); border:1px solid #ef9a9a; font-weight:700;">0 active</span>
-    </div>
-    <p class="section-desc">Emergency alerts triggered by delivery agents. Acknowledge to let the agent know you've been notified.</p>
-    <div id="sosBanner" style="display:none; background:#b3261e; color:#fff; padding:12px 16px; border-radius:8px; margin-bottom:14px; font-weight:600; animation: flash-sos 1s infinite;">
-      EMERGENCY — New SOS alert received!
-    </div>
-    <div id="sosCards"></div>
-    <div id="sosEmpty" style="color:var(--soft); font-size:0.9rem; padding:20px 0; text-align:center;">No active SOS alerts.</div>
-  </div>
-
-  <!-- SECTION 4: AGENT DELIVERY PORTAL (AGENT ROLE ONLY) -->
-
-  <div class="box" id="agentPortalSection" style="display:none;">
-    <h2>🚚 My Delivery Route Today</h2>
-    <p class="section-desc">Welcome! Here are your assigned cylinder deliveries for today. Update delivery statuses as you deliver.</p>
-    
-    <div id="agentSummaryCard" style="background:#eef5f8; border-left:4px solid var(--blue); padding:16px; border-radius:0 8px 8px 0; margin-bottom:20px;">
-      <div class="stats" style="margin:0;">
-        <div><b id="myTotalStops">0</b><span>My Assigned Stops</span></div>
-        <div><b id="myDeliveredStops" style="color:var(--green)">0</b><span>Delivered</span></div>
-        <div><b id="myPendingStops" style="color:var(--amber)">0</b><span>Pending</span></div>
-      </div>
-    </div>
-
-    <div class="table-responsive">
-      <table>
-        <thead>
-          <tr>
-            <th>Stop #</th>
-            <th>Customer</th>
-            <th>Phone</th>
-            <th>Address / Area</th>
-            <th>Cylinders</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody id="myOrderRows">
-          <tr><td colspan="7">Loading your assigned orders…</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div id="agentPortalMsg" class="msg-banner"></div>
-  </div>
-
 </div>
 
 <script>
@@ -468,6 +667,8 @@ function applyUserRole() {
   // Agent Portal is ONLY for AGENT role
   document.getElementById('agentPortalSection').style.display = (role === 'AGENT') ? 'block' : 'none';
 
+  decorateShell();
+
   if (role === 'ADMIN') {
     loadUsers();
   }
@@ -484,6 +685,45 @@ function applyUserRole() {
       }
     }, 10000);
   }
+}
+
+/* ================= SHELL: greeting, avatar and sidebar ================= */
+function decorateShell() {
+  const name = currentUser.name || 'there';
+  document.getElementById('userAvatar').textContent = initials(name);
+
+  const hour = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }));
+  const part = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('pageGreeting').textContent = `${part}, ${name.split(' ')[0]}`;
+  document.getElementById('todayLabel').textContent = new Date().toLocaleDateString('en-IN',
+    { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
+
+  // Only link to sections this role can see; drop groups left empty.
+  document.querySelectorAll('#sideNav a[data-section]').forEach(a => {
+    const section = document.getElementById(a.dataset.section);
+    a.style.display = section && section.style.display !== 'none' ? '' : 'none';
+  });
+  document.querySelectorAll('#sideNav .side-group').forEach(g => {
+    const visible = [...g.querySelectorAll('a')].some(a => a.style.display !== 'none');
+    g.style.display = visible ? '' : 'none';
+  });
+
+  // Highlight the last section whose top has scrolled past the top bar.
+  const links = [...document.querySelectorAll('#sideNav a[data-section]')]
+    .filter(a => a.style.display !== 'none');
+  const syncActive = () => {
+    let current = links[0];
+    links.forEach(a => {
+      if (document.getElementById(a.dataset.section).getBoundingClientRect().top <= 140) current = a;
+    });
+    links.forEach(a => a.classList.toggle('active', a === current));
+  };
+  window.addEventListener('scroll', syncActive, { passive: true });
+  syncActive();
+}
+
+function initials(name) {
+  return String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
 }
 
 /* ================= ADMIN USER MANAGEMENT ================= */
@@ -779,39 +1019,50 @@ function renderProgressReport(rep) {
     return;
   }
   const isToday = rep.date === todayStr;
+  const dateLabel = new Date(rep.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  const planTag = rep.planStatus === 'CONFIRMED' ? 'color:var(--green); border-color:#bfe5cc; background:var(--success-50)'
+                : rep.planStatus === 'DRAFT' ? 'color:var(--amber); border-color:#f6dfb5; background:var(--warning-50)' : '';
   let html = `
-    <div style="background:var(--paper); border:1px solid var(--rule); border-radius:9px; padding:15px; margin-bottom:14px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <span style="font-size:0.9rem; font-weight:600; color:var(--ink);">
-          Progress Summary for ${rep.date} ${isToday ? '(Today)' : ''}
-        </span>
-        <span class="tag" style="background:#fff;">Plan Status: <b>${rep.planStatus}</b></span>
+    <div class="progress-panel">
+      <div class="panel-row">
+        <span class="panel-title">${isToday ? '<span class="today-dot"></span>' : ''}${dateLabel}${isToday ? ' · Today' : ''}</span>
+        <span class="tag" style="${planTag}">Plan: ${rep.planStatus === 'NO_PLAN' ? 'not made' : rep.planStatus.toLowerCase()}</span>
       </div>
-      <div class="stats" style="margin-bottom:10px;">
-        <div><b>${rep.deliveredOrders} / ${rep.assignedOrders}</b><span>Orders Delivered</span></div>
-        <div><b style="color:var(--green);">${rep.completionRate}%</b><span>Completion Rate</span></div>
-        <div><b>${rep.deliveredCylinders}</b><span>Cylinders Delivered</span></div>
-        ${rep.failedOrders ? `<div><b style="color:var(--red);">${rep.failedOrders}</b><span>Failed Orders</span></div>` : ''}
-        ${rep.carriedOver ? `<div><b style="color:var(--amber);">${rep.carriedOver}</b><span>Carried Over</span></div>` : ''}
+      <div class="stats" style="margin-bottom:0;">
+        <div><b>${rep.deliveredOrders}<span style="display:inline; font-size:1rem; color:var(--faint); font-weight:600;"> / ${rep.assignedOrders}</span></b><span>Orders delivered</span></div>
+        <div><b style="color:var(--green);">${rep.completionRate}%</b><span>Completion rate</span></div>
+        <div><b>${rep.deliveredCylinders}</b><span>Cylinders delivered</span></div>
+        <div><b style="color:${rep.failedOrders ? 'var(--red)' : 'var(--ink)'};">${rep.failedOrders}</b><span>Failed</span></div>
+        <div><b style="color:${rep.carriedOver ? 'var(--amber)' : 'var(--ink)'};">${rep.carriedOver}</b><span>Waiting / carried over</span></div>
       </div>
   `;
-  
+
   if (rep.agentProgress && rep.agentProgress.length > 0) {
-    html += `<div style="font-size:0.83rem; font-weight:600; color:var(--soft); margin:12px 0 6px;">AGENT BREAKDOWN:</div>`;
+    html += `<div class="subhead">By agent</div><div class="agent-progress">`;
     html += rep.agentProgress.map(ap => {
       const rate = ap.assigned === 0 ? 0 : Math.round(ap.delivered / ap.assigned * 100);
+      const onDuty = ap.checkInAt && !ap.checkOutAt;
+      const since = ap.checkInAt ? new Date(ap.checkInAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null;
+      const duty = onDuty ? `<span style="color:var(--green)">On duty since ${since}</span>`
+                 : ap.checkOutAt ? 'Checked out' : 'Not checked in';
       return `
-        <div style="background:#fff; border:1px solid var(--rule); border-radius:7px; padding:8px 12px; margin-bottom:6px; font-size:0.88rem;">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <b>${escapeHtml(ap.agentName)}</b>
-            <span style="color:var(--soft); font-size:0.82rem;">${ap.delivered} of ${ap.assigned} delivered (${ap.cylindersDelivered} cyl)</span>
+        <div class="ap-card">
+          <div class="ap-top">
+            <span class="avatar">${escapeHtml(initials(ap.agentName))}</span>
+            <div>
+              <div class="ap-name">${escapeHtml(ap.agentName)}</div>
+              <div class="ap-meta">${duty}</div>
+            </div>
+            <span class="ap-pct">${rate}%</span>
           </div>
-          <div class="bar" style="margin:4px 0 2px;"><i class="${rate >= 100 ? 'success' : ''}" style="width:${rate}%"></i></div>
+          <div class="bar"><i class="${rate >= 100 ? 'success' : ''}" style="width:${rate}%"></i></div>
+          <div class="ap-meta">${ap.delivered} of ${ap.assigned} delivered · ${ap.cylindersDelivered} cylinders${ap.failed ? ` · <span style="color:var(--red)">${ap.failed} failed</span>` : ''}</div>
         </div>
       `;
     }).join('');
+    html += `</div>`;
   }
-  
+
   html += `</div>`;
   block.innerHTML = html;
 }
@@ -822,14 +1073,14 @@ async function loadPlan() {
     const p = await fetch('/api/plan').then(r => r.ok ? r.json() : null);
     renderPlan(p);
   } catch (e) {
-    document.getElementById('planContent').innerHTML = '<p style="color:var(--soft)">Error loading plan.</p>';
+    document.getElementById('planContent').innerHTML = '<div class="empty">Could not load the plan.</div>';
   }
 }
 
 function renderPlan(p) {
   const msg = document.getElementById('planMsg');
   if (!p) {
-    document.getElementById('planContent').innerHTML = '<p style="color:var(--soft)">No draft plan generated yet today. Import orders above and click "Plan the day".</p>';
+    document.getElementById('planContent').innerHTML = '<div class="empty">No plan yet today. Import orders, then click <b>Plan the day</b>.</div>';
     document.getElementById('stats').innerHTML = '';
     document.getElementById('summary').innerHTML = '';
     document.getElementById('confirmBtn').disabled = true;
@@ -850,7 +1101,7 @@ function renderPlan(p) {
 
   const canEditPlan = currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER');
 
-  let html = p.agents.map(ag => {
+  let html = '<div class="agentcards">' + p.agents.map(ag => {
     const pct = Math.min(100, Math.round(ag.orders / ag.cap * 100));
     return `
       <div class="agentcard">
@@ -868,7 +1119,8 @@ function renderPlan(p) {
               </select>` : ''}
           </div>`).join('')}
       </div>`;
-  }).join('');
+  }).join('') + '</div>';
+  if (!p.agents.length) html = '';
 
   if (p.unassigned && p.unassigned.length) {
     html += `<div class="summary warn"><b>Not covered today</b><br>`
@@ -876,7 +1128,7 @@ function renderPlan(p) {
           + `</div>`;
   }
 
-  document.getElementById('planContent').innerHTML = html || '<p style="color:var(--soft)">Nothing to plan — no orders are waiting.</p>';
+  document.getElementById('planContent').innerHTML = html || '<div class="empty">Nothing to plan. No orders are waiting.</div>';
   document.getElementById('confirmBtn').disabled = !canEditPlan || p.status !== 'DRAFT' || p.agents.length === 0;
   msg.textContent = '';
 }
@@ -1164,6 +1416,9 @@ function renderSosAlerts(alerts) {
   const countBadge = document.getElementById('sosCount');
 
   countBadge.textContent = alerts.length + ' active';
+  const navBadge = document.getElementById('navSosCount');
+  navBadge.textContent = alerts.length;
+  navBadge.classList.toggle('show', alerts.length > 0);
 
   if (alerts.length === 0) {
     cardsDiv.innerHTML = '';

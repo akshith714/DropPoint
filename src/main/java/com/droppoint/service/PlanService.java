@@ -297,19 +297,19 @@ public class PlanService {
         facts.append("Total orders: ").append(result.totalOrders())
              .append(". Total capacity: ").append(result.totalCapacity()).append(".\n");
         result.assignments().forEach(a -> facts.append(a.agentName()).append(" takes ")
-                .append(a.orders()).append(" in ").append(a.areaName())
+                .append(a.orders()).append(" orders in ").append(a.areaName())
                 .append(a.partial() ? " (part of the area)" : "").append(".\n"));
         result.leftovers().forEach(l -> facts.append(l.orders()).append(" orders in ")
                 .append(l.areaName()).append(" do not fit: ").append(l.reason()).append(".\n"));
         result.notes().forEach(n -> facts.append(n).append("\n"));
 
         try {
-            return assistant.ask("""
+            return assistant.write("""
                     Write two or three sentences for the branch manager summarising today's delivery plan.
                     Use only these facts. Name the agents and the numbers. Mention anything that needs
                     a decision. Do not add advice beyond the facts.
 
-                    """ + facts).answer();
+                    """ + facts);
         } catch (Exception e) {
             log.warn("Summary unavailable: {}", e.getMessage());
             return facts.toString();

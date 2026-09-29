@@ -2,444 +2,193 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0b1220">
     <title>DropPoint Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/app.css">
     <style>
-        :root {
-            --primary: #0f62fe;
-            --dark: #0f172a;
-            --slate: #1e293b;
-            --green: #1e6b47;
-            --amber: #9a6a00;
-            --red: #b3261e;
-            --border: #e2e8f0;
-            --bg: #f8fafc;
-            --text-dark: #334155;
-            --text-light: #94a3b8;
-        }
+        /* names the page scripts use */
+        :root { --primary: var(--brand); --border: var(--line); --text-dark: var(--ink-2); --dark: var(--ink); }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            -webkit-tap-highlight-color: transparent;
-        }
+        * { -webkit-tap-highlight-color: transparent; }
+        body { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); font-size: 15px; }
 
-        body {
-            background-color: var(--bg);
-            color: var(--slate);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            margin: 0;
-            padding: 0;
-        }
-
-        /* Header */
+        /* ---------- header ---------- */
         header {
-            background-color: var(--dark);
-            color: white;
-            padding: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            height: 64px;
+            background: radial-gradient(600px 240px at 0% 0%, #1e3a8a 0%, transparent 70%), var(--night);
+            color: #fff;
+            padding: calc(14px + env(safe-area-inset-top)) 16px 22px;
+            border-radius: 0 0 22px 22px;
             flex-shrink: 0;
-            z-index: 10;
         }
+        .head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 1rem; letter-spacing: -0.01em; }
+        .brand .mark { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: linear-gradient(135deg, #3b82f6, #6366f1); }
+        .brand svg { width: 16px; height: 16px; fill: #fff; }
+        .head-actions { display: flex; gap: 8px; }
+        .head-btn {
+            height: 36px; min-width: 36px; padding: 0 12px; border-radius: 10px;
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+            color: #e2e8f0; font: inherit; font-size: 0.8rem; font-weight: 600; text-decoration: none; cursor: pointer;
+        }
+        .head-btn.icon { padding: 0; }
+        .head-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .greeting { margin-top: 18px; display: flex; align-items: center; gap: 12px; }
+        .greeting .avatar { width: 44px; height: 44px; font-size: 0.95rem; box-shadow: 0 0 0 3px rgba(255,255,255,0.12); }
+        .greeting small { display: block; color: #94a3b8; font-size: 0.8rem; }
+        .agent-name { display: block; font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70vw; }
 
-        /* Top Segmented Navigation Bar */
-        .top-tab-bar {
-            display: flex;
-            background: #1e293b;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 6px 12px;
-            gap: 8px;
-            z-index: 100;
-        }
-
-        .top-tab-btn {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: #94a3b8;
-            padding: 10px 4px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            border-radius: 6px;
-            cursor: pointer;
-            text-align: center;
-            transition: background 0.15s ease, color 0.15s ease;
-        }
-
-        .top-tab-btn.active {
-            background: var(--primary);
-            color: white;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 600;
-            font-size: 1.1rem;
-        }
-
-        .brand svg {
-            width: 24px;
-            height: 24px;
-            fill: var(--primary);
-        }
-
-        .agent-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .agent-name {
-            font-size: 0.9rem;
-            max-width: 120px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .logout-btn {
-            background: transparent;
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            cursor: pointer;
-        }
-
-        /* Main Content Area */
-        main {
-            flex: 1;
-            overflow-y: auto;
-            position: relative;
-            padding-bottom: 90px;
-        }
-
-        .tab-content {
-            display: none;
-            padding: 16px;
-            animation: fadeIn 0.2s ease-in-out;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
+        /* ---------- layout ---------- */
+        main { flex: 1; padding-bottom: calc(92px + env(safe-area-inset-bottom)); margin-top: -8px; }
+        .tab-content { display: none; padding: 16px; animation: fadeIn 0.2s ease-out; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
         /* Deliveries and SOS appear only once the agent is checked in */
-        body:not(.on-duty) .duty-only {
-            display: none !important;
-        }
+        body:not(.on-duty) .duty-only { display: none !important; }
 
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        /* Bottom Nav */
-        nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background-color: #ffffff;
-            border-top: 2px solid var(--border);
-            display: flex;
-            height: 64px;
-            z-index: 10000;
-            box-shadow: 0 -4px 12px rgba(0,0,0,0.12);
-        }
-
-        .nav-item {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-light);
-            cursor: pointer;
-            gap: 4px;
-        }
-
-        .nav-item.active {
-            color: var(--primary);
-        }
-
-        .nav-item svg {
-            width: 24px;
-            height: 24px;
-            fill: currentColor;
-        }
-
-        .nav-item span {
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
-        /* Common Elements */
         .card {
-            background: white;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 16px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
+            padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow-sm);
         }
+        h2 { font-size: 1.02rem; font-weight: 650; margin: 0 0 12px; color: var(--ink); letter-spacing: -0.01em; }
+        .muted { color: var(--muted); font-size: 0.84rem; }
 
-        h2 {
-            font-size: 1.25rem;
-            margin-bottom: 16px;
-            color: var(--dark);
-        }
-
+        /* ---------- buttons ---------- */
         .btn {
-            display: block;
-            width: 100%;
-            padding: 16px;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            color: white;
-            cursor: pointer;
-            text-align: center;
-            margin-top: 16px;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            width: 100%; padding: 15px; margin-top: 16px;
+            font: inherit; font-size: 0.98rem; font-weight: 600; color: #fff;
+            border: none; border-radius: 12px; cursor: pointer;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.1), inset 0 1px 0 rgba(255,255,255,0.12);
+            transition: transform 0.08s, filter 0.15s;
         }
+        .btn:active { transform: scale(0.985); filter: brightness(0.95); }
+        .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+        .btn-green { background: var(--success); }
+        .btn-amber { background: #d97706; }
+        .btn-red { background: var(--danger); }
+        .btn-primary { background: var(--brand); }
+        .btn-sm { padding: 11px 14px; font-size: 0.9rem; margin-top: 0; border-radius: 10px; }
+        .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 10px; }
+        .error-msg:empty { display: none; }
 
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .btn-green { background-color: var(--green); }
-        .btn-amber { background-color: var(--amber); }
-        .btn-red { background-color: var(--red); }
-        .btn-primary { background-color: var(--primary); }
-
-        .btn-sm {
-            padding: 10px 16px;
-            font-size: 0.9rem;
-            margin-top: 0;
-            border-radius: 6px;
-        }
-
-        .error-msg {
-            color: var(--red);
-            font-size: 0.85rem;
-            margin-top: 8px;
-        }
-
-        /* Check-In Tab */
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 0.85rem;
-            font-weight: 500;
-        }
-
-        .status-active {
-            background-color: #dcfce7;
-            color: #166534;
-        }
-
-        .status-inactive {
-            background-color: #f1f5f9;
-            color: #475569;
-        }
-
-        .pulse-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: var(--green);
-            animation: pulse 1.5s infinite;
-        }
-
+        /* ---------- duty ---------- */
+        .duty-card h2 { display: flex; align-items: center; justify-content: space-between; }
+        .gps-line { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; color: var(--muted); padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 14px; }
+        .gps-line svg { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        #gpsStatusText { font-weight: 600; }
+        .status-badge { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+        .status-active { background: var(--success-50); color: var(--success); }
+        .status-inactive { background: #eef1f5; color: var(--ink-2); }
+        .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse 1.6s infinite; }
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(30, 107, 71, 0.4); }
-            70% { box-shadow: 0 0 0 6px rgba(30, 107, 71, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(30, 107, 71, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(21,128,61,0.45); }
+            70% { box-shadow: 0 0 0 7px rgba(21,128,61,0); }
+            100% { box-shadow: 0 0 0 0 rgba(21,128,61,0); }
         }
+        #checkInActions > div { font-size: 0.9rem; }
 
-        /* Deliveries Tab */
+        .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .quick-tile {
+            display: flex; flex-direction: column; align-items: flex-start; gap: 10px; text-align: left;
+            padding: 16px; border-radius: var(--radius-lg); border: 1px solid var(--line); background: var(--surface);
+            font: inherit; color: var(--ink); cursor: pointer; box-shadow: var(--shadow-sm);
+        }
+        .quick-tile:active { transform: scale(0.98); }
+        .quick-tile .qi { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; }
+        .quick-tile .qi svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .quick-tile b { font-size: 0.92rem; }
+        .quick-tile span.muted { font-size: 0.76rem; }
+
+        /* ---------- deliveries ---------- */
+        .progress-container { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow-sm); }
+        .progress-text { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; font-size: 0.86rem; color: var(--muted); font-weight: 500; }
+        #deliveryProgressText { font-size: 1.1rem; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+        .progress-bar { height: 8px; background: #e9edf3; border-radius: 99px; overflow: hidden; }
+        .progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #22c55e, var(--success)); border-radius: 99px; transition: width 0.4s ease; }
+        .list-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .list-head h2 { margin: 0; }
+        .refresh-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-2); font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+        .refresh-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        .delivery-card { position: relative; padding-left: 20px; overflow: hidden; }
+        .delivery-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--line-strong); }
+        .delivery-card.status-ASSIGNED::before { background: #f59e0b; }
+        .delivery-card.status-DELIVERED::before { background: var(--success); }
+        .delivery-card.status-FAILED::before { background: var(--danger); }
+        .delivery-card.status-DELIVERED, .delivery-card.status-FAILED { background: var(--surface-2); box-shadow: none; }
+        .delivery-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+        .customer-name { font-weight: 650; font-size: 1.02rem; letter-spacing: -0.01em; }
+        .cylinder-count { flex-shrink: 0; background: var(--brand-50); color: var(--brand-600); padding: 3px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 600; }
+        .delivery-details { font-size: 0.87rem; color: var(--ink-2); line-height: 1.45; }
+        .area-chip { display: inline-block; margin-top: 6px; font-size: 0.72rem; font-weight: 600; color: var(--muted); background: #eef1f5; padding: 2px 8px; border-radius: 6px; }
+        .status-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+        .detail-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
         .phone-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            color: var(--primary);
-            text-decoration: none;
-            font-weight: 500;
-            margin-top: 8px;
-            padding: 8px 12px;
-            background: #eff6ff;
-            border-radius: 6px;
-            border: 1px solid #bfdbfe;
-            font-size: 0.9rem;
-            cursor: pointer;
-            touch-action: manipulation;
+            display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+            color: var(--brand-600); background: var(--brand-50); border: 1px solid var(--brand-100);
+            padding: 8px 12px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; touch-action: manipulation;
         }
-        .phone-link:active {
-            background: #dbeafe;
-        }
+        .phone-link:active { background: var(--brand-100); }
+        .delivery-actions { display: flex; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+        .delivery-actions .btn { flex: 1; }
+        .empty-state { text-align: center; padding: 36px 20px; color: var(--muted); background: var(--surface); border: 1px dashed var(--line-strong); border-radius: var(--radius-lg); }
+        .empty-state svg { width: 36px; height: 36px; stroke: var(--faint); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; margin-bottom: 8px; }
+        .empty-state b { display: block; color: var(--ink); margin-bottom: 4px; }
 
-        .progress-container {
-            margin-bottom: 16px;
-        }
-
-        .progress-text {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.9rem;
-            font-weight: 500;
-            margin-bottom: 8px;
-        }
-
-        .progress-bar {
-            height: 8px;
-            background-color: var(--border);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background-color: var(--primary);
-            width: 0%;
-            transition: width 0.3s;
-        }
-
-        .delivery-card {
-            border-left: 4px solid var(--border);
-        }
-
-        .delivery-card.status-ASSIGNED { border-left-color: var(--amber); }
-        .delivery-card.status-DELIVERED { border-left-color: var(--green); opacity: 0.7; }
-        .delivery-card.status-FAILED { border-left-color: var(--red); opacity: 0.7; }
-
-        .delivery-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-        }
-
-        .customer-name { font-weight: 600; font-size: 1.1rem; }
-        .cylinder-count { 
-            background: var(--bg);
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-
-        .delivery-details {
-            font-size: 0.9rem;
-            color: var(--text-dark);
-            margin-bottom: 12px;
-            line-height: 1.4;
-        }
-
-        .phone-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            color: var(--primary);
-            text-decoration: none;
-            font-weight: 500;
-            margin-top: 4px;
-            display: block;
-        }
-
-        .delivery-actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid var(--border);
-        }
-
-        .delivery-actions .btn {
-            flex: 1;
-        }
-
-        /* SOS Tab */
-        .sos-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: calc(100vh - 128px); /* minus header and nav */
-            text-align: center;
-        }
-
+        /* ---------- SOS ---------- */
+        .sos-container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: calc(100vh - 260px); text-align: center; padding: 20px 0; }
+        .sos-ring { padding: 18px; border-radius: 50%; background: radial-gradient(circle, rgba(220,38,38,0.08) 0%, rgba(220,38,38,0.03) 70%); margin-bottom: 26px; }
         .sos-btn {
-            width: 200px;
-            height: 200px;
-            border-radius: 50%;
-            background-color: var(--red);
-            color: white;
-            border: none;
-            font-size: 2rem;
-            font-weight: bold;
-            box-shadow: 0 4px 12px rgba(179, 38, 30, 0.4);
-            margin-bottom: 24px;
-            transition: transform 0.1s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            -webkit-user-select: none;
-            user-select: none;
+            width: 190px; height: 190px; border-radius: 50%; border: none; cursor: pointer;
+            background: radial-gradient(circle at 35% 30%, #f87171, var(--danger) 55%, #b91c1c);
+            color: #fff; font: inherit; font-size: 2.1rem; font-weight: 800; letter-spacing: 0.06em;
+            box-shadow: 0 14px 34px rgba(220,38,38,0.4), inset 0 -6px 14px rgba(0,0,0,0.15), 0 0 0 8px rgba(220,38,38,0.12);
+            display: flex; align-items: center; justify-content: center; transition: transform 0.12s;
+            -webkit-user-select: none; user-select: none;
         }
-
-        .sos-btn:active {
-            transform: scale(0.95);
-        }
-
-        .sos-btn.active-sos {
-            animation: pulse-red 1s infinite;
-        }
-
+        .sos-btn:active { transform: scale(0.95); }
+        .sos-btn.active-sos { font-size: 1.3rem; animation: pulse-red 1.1s infinite; }
         @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(179, 38, 30, 0.7); }
-            70% { box-shadow: 0 0 0 20px rgba(179, 38, 30, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(179, 38, 30, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(220,38,38,0.7), 0 14px 34px rgba(220,38,38,0.4); }
+            70% { box-shadow: 0 0 0 26px rgba(220,38,38,0), 0 14px 34px rgba(220,38,38,0.4); }
+            100% { box-shadow: 0 0 0 0 rgba(220,38,38,0), 0 14px 34px rgba(220,38,38,0.4); }
         }
+        .sos-instructions { color: var(--ink-2); font-size: 0.95rem; padding: 0 28px; line-height: 1.5; }
+        .sos-instructions b { display: block; font-size: 1.1rem; color: var(--ink); margin-bottom: 4px; }
+        .sos-status-msg { margin-top: 12px; font-weight: 700; color: var(--danger); line-height: 1.5; }
 
-        .sos-instructions {
-            color: var(--text-dark);
-            font-size: 1.1rem;
-            padding: 0 24px;
-            line-height: 1.5;
+        /* ---------- bottom nav ---------- */
+        nav {
+            position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom));
+            display: flex; height: 64px; padding: 6px; z-index: 1000;
+            background: rgba(255,255,255,0.92); backdrop-filter: blur(14px);
+            border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 10px 30px rgba(15,23,42,0.14);
         }
-
-        .sos-status-msg {
-            margin-top: 16px;
-            font-weight: 600;
-            color: var(--red);
+        .nav-item {
+            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+            border-radius: 13px; color: var(--faint); cursor: pointer; transition: background 0.15s, color 0.15s;
         }
+        .nav-item svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .nav-item span { font-size: 0.7rem; font-weight: 600; }
+        .nav-item.active { color: var(--brand); background: var(--brand-50); }
+        #nav-sos.active { color: var(--danger); background: var(--danger-50); }
 
+        /* ---------- loading ---------- */
         .loading-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255,255,255,0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            font-weight: bold;
-            color: var(--primary);
-            display: none;
+            position: fixed; inset: 0; z-index: 2000; display: none;
+            align-items: center; justify-content: center; flex-direction: column; gap: 12px;
+            background: rgba(244,246,250,0.75); backdrop-filter: blur(3px);
+            color: var(--ink-2); font-weight: 600; font-size: 0.9rem;
+        }
+        .loading-overlay::before {
+            content: ""; width: 34px; height: 34px; border-radius: 50%;
+            border: 3px solid var(--brand-100); border-top-color: var(--brand); animation: spin 0.8s linear infinite;
         }
     </style>
 </head>
@@ -447,62 +196,68 @@
 
     <!-- Header -->
     <header>
-        <div class="brand">
-            <svg viewBox="0 0 24 24">
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-            </svg>
-            DropPoint
+        <div class="head-row">
+            <div class="brand">
+                <span class="mark"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></span>
+                DropPoint
+            </div>
+            <div class="head-actions">
+                <a href="/assistant.html" class="head-btn">
+                    <svg viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
+                    Ask AI
+                </a>
+                <button class="head-btn icon" onclick="logout()" aria-label="Log out" title="Log out">
+                    <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+                </button>
+            </div>
         </div>
-        <div class="agent-info">
-            <span class="agent-name" id="agentNameDisplay">Agent</span>
-            <a href="/assistant.html" style="color: #90caf9; text-decoration: none; font-size: 0.82rem; font-weight: 500; border: 1px solid rgba(144, 202, 249, 0.4); padding: 5px 10px; border-radius: 4px;">Ask AI 💬</a>
-            <button class="logout-btn" onclick="logout()">Logout</button>
+        <div class="greeting">
+            <span class="avatar" id="agentAvatar">?</span>
+            <div style="min-width:0">
+                <small id="greetingText">Welcome</small>
+                <span class="agent-name" id="agentNameDisplay">Agent</span>
+            </div>
         </div>
     </header>
-
-    <!-- Top Navigation Tabs (Always Visible Below Header) -->
-    <div class="top-tab-bar">
-        <button class="top-tab-btn active" id="top-nav-checkin" onclick="switchTab('checkin')">Check-In</button>
-        <button class="top-tab-btn duty-only" id="top-nav-deliveries" onclick="switchTab('deliveries')">Deliveries</button>
-        <button class="top-tab-btn duty-only" id="top-nav-sos" onclick="switchTab('sos')">SOS Alert</button>
-    </div>
 
     <!-- Main Content -->
     <main>
         <!-- Check-In Tab -->
         <div id="tab-checkin" class="tab-content active">
-            <div class="card">
-                <h2>Duty Status</h2>
-                
-                <div id="gpsStatusContainer" style="margin-bottom: 16px; font-size: 0.9rem;">
-                    <span>GPS Status: </span>
-                    <strong id="gpsStatusText">Acquiring GPS...</strong>
-                </div>
+            <div class="card duty-card">
+                <h2>Duty status
+                    <span id="dutyStatusContainer">
+                        <span class="status-badge status-inactive" id="dutyBadge">
+                            <span id="dutyBadgeText">Not Checked In</span>
+                        </span>
+                    </span>
+                </h2>
 
-                <div id="dutyStatusContainer" style="margin-bottom: 24px;">
-                    <div class="status-badge status-inactive" id="dutyBadge">
-                        <span id="dutyBadgeText">Not Checked In</span>
-                    </div>
+                <div class="gps-line" id="gpsStatusContainer">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg>
+                    <span>GPS</span>
+                    <strong id="gpsStatusText">Acquiring GPS...</strong>
                 </div>
 
                 <div id="checkInActions">
                     <!-- Dynamic content -->
                 </div>
-                
+
                 <div id="checkInError" class="error-msg"></div>
             </div>
 
-            <!-- Quick Access Card (on duty only) -->
-            <div class="card duty-only" style="margin-top: 16px;">
-                <h2>Agent Quick Access</h2>
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <button class="btn btn-primary" onclick="switchTab('deliveries')" style="margin-top:0; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                        <span>📦 View Today's Deliveries & Orders</span>
-                    </button>
-                    <button class="btn btn-red" onclick="switchTab('sos')" style="margin-top:0; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                        <span>🚨 Emergency SOS Alert</span>
-                    </button>
-                </div>
+            <!-- Quick Access (on duty only) -->
+            <div class="quick-grid duty-only">
+                <button class="quick-tile" onclick="switchTab('deliveries')">
+                    <span class="qi" style="background:var(--brand-50); color:var(--brand);"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></span>
+                    <b>Today's deliveries</b>
+                    <span class="muted">Your stops and codes</span>
+                </button>
+                <button class="quick-tile" onclick="switchTab('sos')">
+                    <span class="qi" style="background:var(--danger-50); color:var(--danger);"><svg viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+                    <b>Emergency SOS</b>
+                    <span class="muted">Alert your manager</span>
+                </button>
             </div>
         </div>
 
@@ -510,16 +265,20 @@
         <div id="tab-deliveries" class="tab-content">
             <div class="progress-container">
                 <div class="progress-text">
-                    <span>Deliveries Today</span>
+                    <span>Delivered today</span>
                     <span id="deliveryProgressText">0 of 0</span>
                 </div>
                 <div class="progress-bar">
                     <div class="progress-fill" id="deliveryProgressBar"></div>
                 </div>
             </div>
-            
-            <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
-                <button class="btn btn-sm btn-primary" style="width: auto;" onclick="loadDeliveries()">Refresh</button>
+
+            <div class="list-head">
+                <h2>Stops</h2>
+                <button class="refresh-btn" onclick="loadDeliveries()">
+                    <svg viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15"/></svg>
+                    Refresh
+                </button>
             </div>
 
             <div id="deliveriesList">
@@ -530,9 +289,12 @@
         <!-- SOS Tab -->
         <div id="tab-sos" class="tab-content">
             <div class="sos-container">
-                <button id="sosBtn" class="sos-btn">SOS</button>
+                <div class="sos-ring">
+                    <button id="sosBtn" class="sos-btn">SOS</button>
+                </div>
                 <div class="sos-instructions" id="sosInstructions">
-                    Press and hold for 2 seconds to trigger emergency alert
+                    <b>Emergency alert</b>
+                    Press and hold for 2 seconds. Your manager sees your location immediately.
                 </div>
                 <div class="sos-status-msg" id="sosStatusMsg"></div>
             </div>
@@ -542,21 +304,15 @@
     <!-- Bottom Navigation -->
     <nav>
         <div class="nav-item active" onclick="switchTab('checkin')" id="nav-checkin">
-            <svg viewBox="0 0 24 24">
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-            </svg>
-            <span>Check-In</span>
+            <svg viewBox="0 0 24 24"><path d="M12 22s7-7.5 7-13a7 7 0 1 0-14 0c0 5.5 7 13 7 13z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            <span>Duty</span>
         </div>
         <div class="nav-item duty-only" onclick="switchTab('deliveries')" id="nav-deliveries">
-            <svg viewBox="0 0 24 24">
-                <path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-            </svg>
+            <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
             <span>Deliveries</span>
         </div>
         <div class="nav-item duty-only" onclick="switchTab('sos')" id="nav-sos">
-            <svg viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-            </svg>
+            <svg viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
             <span>SOS</span>
         </div>
     </nav>
@@ -578,7 +334,13 @@
                     window.location.href = '/login.html';
                     return;
                 }
-                document.getElementById('agentNameDisplay').textContent = currentUser.name || 'Agent';
+                const name = currentUser.name || 'Agent';
+                document.getElementById('agentNameDisplay').textContent = name;
+                document.getElementById('agentAvatar').textContent =
+                    name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+                const hour = new Date().getHours();
+                document.getElementById('greetingText').textContent =
+                    hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
             } catch (e) {
                 window.location.href = '/login.html';
             }
@@ -721,14 +483,12 @@
                 
                 const msg = document.createElement('div');
                 msg.textContent = `Live tracking active (Since ${timeStr})`;
-                msg.style.marginBottom = '16px';
-                msg.style.color = 'var(--green)';
-                msg.style.fontWeight = '600';
+                msg.style.color = 'var(--muted)';
                 container.appendChild(msg);
 
                 const btn = document.createElement('button');
                 btn.className = 'btn btn-amber';
-                btn.textContent = 'CHECK OUT';
+                btn.textContent = 'Check out';
                 btn.onclick = handleCheckOut;
                 container.appendChild(btn);
                 
@@ -846,7 +606,7 @@
         // --- Deliveries Tab Logic ---
         async function loadDeliveries() {
             const list = document.getElementById('deliveriesList');
-            list.innerHTML = '<div style="text-align:center; padding: 20px;">Loading...</div>';
+            list.innerHTML = '<div class="empty-state"><span class="spinner" style="color:var(--brand)"></span></div>';
             
             try {
                 const res = await fetch(`/api/agents/${currentUser.id}/orders`);
@@ -866,6 +626,12 @@
             }
         }
 
+        /** Escapes text from the server before it goes into innerHTML. */
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g,
+                c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
         function renderDeliveries(orders) {
             const list = document.getElementById('deliveriesList');
             list.innerHTML = '';
@@ -874,7 +640,12 @@
             let total = orders.length;
 
             if (total === 0) {
-                list.innerHTML = '<div style="text-align:center; padding: 20px;">No deliveries assigned.</div>';
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+                        <b>No deliveries yet</b>
+                        Your stops appear here once the manager confirms today's plan.
+                    </div>`;
             }
 
             orders.forEach(order => {
@@ -888,25 +659,29 @@
                     actionsHtml = `
                     <div class="delivery-actions">
                         <button class="btn btn-sm btn-green" onclick="markDelivered(${order.id})">Delivered</button>
-                        <button class="btn btn-sm btn-red" onclick="markFailed(${order.id})">Failed</button>
+                        <button class="btn btn-sm btn-red" style="background:var(--surface); color:var(--danger); border:1px solid #f5c2c2; box-shadow:none;" onclick="markFailed(${order.id})">Failed</button>
                     </div>`;
                 }
 
-                let statusLabel = order.status;
-                let statusColor = order.status === 'ASSIGNED' ? 'var(--amber)' : (order.status === 'DELIVERED' ? 'var(--green)' : 'var(--red)');
+                const statusLabel = { ASSIGNED: 'To deliver', DELIVERED: 'Delivered', FAILED: 'Not delivered' }[order.status] || order.status;
+                const statusColor = order.status === 'ASSIGNED' ? '#b45309' : (order.status === 'DELIVERED' ? 'var(--green)' : 'var(--red)');
+                const cyl = order.cylinderCount === 1 ? '1 cylinder' : `${order.cylinderCount} cylinders`;
 
                 card.innerHTML = `
                     <div class="delivery-header">
-                        <span class="customer-name">${order.customerName}</span>
-                        <span class="cylinder-count">${order.cylinderCount} Cylinders</span>
+                        <span class="customer-name">${esc(order.customerName)}</span>
+                        <span class="cylinder-count">${cyl}</span>
                     </div>
                     <div class="delivery-details">
-                        <div>${order.address}, ${order.areaName}</div>
-                        <a href="tel:${order.customerPhone}" class="phone-link">
-                            <svg style="width:16px; height:16px; fill:currentColor" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
-                            ${order.customerPhone}
+                        <div>${esc(order.address)}</div>
+                        ${order.areaName ? `<span class="area-chip">${esc(order.areaName)}</span>` : ''}
+                    </div>
+                    <div class="detail-row">
+                        <a href="tel:${esc(order.customerPhone)}" class="phone-link">
+                            <svg style="width:15px; height:15px; fill:currentColor" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+                            Call ${esc(order.customerPhone)}
                         </a>
-                        <div style="margin-top: 8px; font-weight: bold; color: ${statusColor}">${statusLabel}</div>
+                        <span class="status-chip" style="color:${statusColor}">${statusLabel}</span>
                     </div>
                     ${actionsHtml}
                 `;
