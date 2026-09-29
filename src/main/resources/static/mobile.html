@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DropPoint Agent</title>
+    <style>
+        :root {
+            --primary: #0f62fe;
+            --dark: #0f172a;
+            --slate: #1e293b;
+            --green: #1e6b47;
+            --amber: #9a6a00;
+            --red: #b3261e;
+            --border: #e2e8f0;
+            --bg: #f8fafc;
+            --text-dark: #334155;
+            --text-light: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--slate);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Header */
+        header {
+            background-color: var(--dark);
+            color: white;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 64px;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        /* Top Segmented Navigation Bar */
+        .top-tab-bar {
+            display: flex;
+            background: #1e293b;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 6px 12px;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .top-tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            padding: 10px 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: center;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+
+        .top-tab-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .brand svg {
+            width: 24px;
+            height: 24px;
+            fill: var(--primary);
+        }
+
+        .agent-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .agent-name {
+            font-size: 0.9rem;
+            max-width: 120px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .logout-btn {
+            background: transparent;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        /* Main Content Area */
+        main {
+            flex: 1;
+            overflow-y: auto;
+            position: relative;
+            padding-bottom: 90px;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 16px;
+            animation: fadeIn 0.2s ease-in-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Bottom Nav */
+        nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: #ffffff;
+            border-top: 2px solid var(--border);
+            display: flex;
+            height: 64px;
+            z-index: 10000;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.12);
+        }
+
+        .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-light);
+            cursor: pointer;
+            gap: 4px;
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        .nav-item svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+
+        .nav-item span {
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        /* Common Elements */
+        .card {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        h2 {
+            font-size: 1.25rem;
+            margin-bottom: 16px;
+            color: var(--dark);
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            text-align: center;
+            margin-top: 16px;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-green { background-color: var(--green); }
+        .btn-amber { background-color: var(--amber); }
+        .btn-red { background-color: var(--red); }
+        .btn-primary { background-color: var(--primary); }
+
+        .btn-sm {
+            padding: 10px 16px;
+            font-size: 0.9rem;
+            margin-top: 0;
+            border-radius: 6px;
+        }
+
+        .error-msg {
+            color: var(--red);
+            font-size: 0.85rem;
+            margin-top: 8px;
+        }
+
+        /* Check-In Tab */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .status-active {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+
+        .status-inactive {
+            background-color: #f1f5f9;
+            color: #475569;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--green);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(30, 107, 71, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(30, 107, 71, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(30, 107, 71, 0); }
+        }
+
+        /* Deliveries Tab */
+        .phone-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: #eff6ff;
+            border-radius: 6px;
+            border: 1px solid #bfdbfe;
+            font-size: 0.9rem;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        .phone-link:active {
+            background: #dbeafe;
+        }
+
+        .progress-container {
+            margin-bottom: 16px;
+        }
+
+        .progress-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background-color: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--primary);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .delivery-card {
+            border-left: 4px solid var(--border);
+        }
+
+        .delivery-card.status-ASSIGNED { border-left-color: var(--amber); }
+        .delivery-card.status-DELIVERED { border-left-color: var(--green); opacity: 0.7; }
+        .delivery-card.status-FAILED { border-left-color: var(--red); opacity: 0.7; }
+
+        .delivery-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .customer-name { font-weight: 600; font-size: 1.1rem; }
+        .cylinder-count { 
+            background: var(--bg);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .delivery-details {
+            font-size: 0.9rem;
+            color: var(--text-dark);
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .phone-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+            margin-top: 4px;
+            display: block;
+        }
+
+        .delivery-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .delivery-actions .btn {
+            flex: 1;
+        }
+
+        /* SOS Tab */
+        .sos-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: calc(100vh - 128px); /* minus header and nav */
+            text-align: center;
+        }
+
+        .sos-btn {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background-color: var(--red);
+            color: white;
+            border: none;
+            font-size: 2rem;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(179, 38, 30, 0.4);
+            margin-bottom: 24px;
+            transition: transform 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .sos-btn:active {
+            transform: scale(0.95);
+        }
+
+        .sos-btn.active-sos {
+            animation: pulse-red 1s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(179, 38, 30, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(179, 38, 30, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(179, 38, 30, 0); }
+        }
+
+        .sos-instructions {
+            color: var(--text-dark);
+            font-size: 1.1rem;
+            padding: 0 24px;
+            line-height: 1.5;
+        }
+
+        .sos-status-msg {
+            margin-top: 16px;
+            font-weight: 600;
+            color: var(--red);
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            font-weight: bold;
+            color: var(--primary);
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="brand">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+            DropPoint
+        </div>
+        <div class="agent-info">
+            <span class="agent-name" id="agentNameDisplay">Agent</span>
+            <a href="/assistant.html" style="color: #90caf9; text-decoration: none; font-size: 0.82rem; font-weight: 500; border: 1px solid rgba(144, 202, 249, 0.4); padding: 5px 10px; border-radius: 4px;">Ask AI 💬</a>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </header>
+
+    <!-- Top Navigation Tabs (Always Visible Below Header) -->
+    <div class="top-tab-bar">
+        <button class="top-tab-btn active" id="top-nav-checkin" onclick="switchTab('checkin')">Check-In</button>
+        <button class="top-tab-btn" id="top-nav-deliveries" onclick="switchTab('deliveries')">Deliveries</button>
+        <button class="top-tab-btn" id="top-nav-sos" onclick="switchTab('sos')">SOS Alert</button>
+    </div>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Check-In Tab -->
+        <div id="tab-checkin" class="tab-content active">
+            <div class="card">
+                <h2>Duty Status</h2>
+                
+                <div id="gpsStatusContainer" style="margin-bottom: 16px; font-size: 0.9rem;">
+                    <span>GPS Status: </span>
+                    <strong id="gpsStatusText">Acquiring GPS...</strong>
+                </div>
+
+                <div id="dutyStatusContainer" style="margin-bottom: 24px;">
+                    <div class="status-badge status-inactive" id="dutyBadge">
+                        <span id="dutyBadgeText">Not Checked In</span>
+                    </div>
+                </div>
+
+                <div id="checkInActions">
+                    <!-- Dynamic content -->
+                </div>
+                
+                <div id="checkInError" class="error-msg"></div>
+            </div>
+
+            <!-- Quick Access Card -->
+            <div class="card" style="margin-top: 16px;">
+                <h2>Agent Quick Access</h2>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button class="btn btn-primary" onclick="switchTab('deliveries')" style="margin-top:0; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span>📦 View Today's Deliveries & Orders</span>
+                    </button>
+                    <button class="btn btn-red" onclick="switchTab('sos')" style="margin-top:0; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <span>🚨 Emergency SOS Alert</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Deliveries Tab -->
+        <div id="tab-deliveries" class="tab-content">
+            <div class="progress-container">
+                <div class="progress-text">
+                    <span>Deliveries Today</span>
+                    <span id="deliveryProgressText">0 of 0</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="deliveryProgressBar"></div>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+                <button class="btn btn-sm btn-primary" style="width: auto;" onclick="loadDeliveries()">Refresh</button>
+            </div>
+
+            <div id="deliveriesList">
+                <!-- Delivery cards will be inserted here -->
+            </div>
+        </div>
+
+        <!-- SOS Tab -->
+        <div id="tab-sos" class="tab-content">
+            <div class="sos-container">
+                <button id="sosBtn" class="sos-btn">SOS</button>
+                <div class="sos-instructions" id="sosInstructions">
+                    Press and hold for 2 seconds to trigger emergency alert
+                </div>
+                <div class="sos-status-msg" id="sosStatusMsg"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav>
+        <div class="nav-item active" onclick="switchTab('checkin')" id="nav-checkin">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+            <span>Check-In</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('deliveries')" id="nav-deliveries">
+            <svg viewBox="0 0 24 24">
+                <path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+            <span>Deliveries</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('sos')" id="nav-sos">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </svg>
+            <span>SOS</span>
+        </div>
+    </nav>
+
+    <div class="loading-overlay" id="loadingOverlay">Processing...</div>
+
+    <script>
+        // --- Authentication Check ---
+        let currentUser = null;
+        function checkAuth() {
+            const saved = localStorage.getItem('dp_user');
+            if (!saved) {
+                window.location.href = '/login.html';
+                return;
+            }
+            try {
+                currentUser = JSON.parse(saved);
+                if (currentUser.role !== 'AGENT') {
+                    window.location.href = '/login.html';
+                    return;
+                }
+                document.getElementById('agentNameDisplay').textContent = currentUser.name || 'Agent';
+            } catch (e) {
+                window.location.href = '/login.html';
+            }
+        }
+        
+        function logout() {
+            localStorage.removeItem('dp_user');
+            window.location.href = '/login.html';
+        }
+
+        checkAuth();
+
+        // --- State Management ---
+        let currentGps = null;
+        let isCheckedIn = false;
+        let activeSos = false;
+        let trackingWatchId = null;
+        let pingInterval = null;
+
+        // --- Tab Switching ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.top-tab-btn').forEach(el => el.classList.remove('active'));
+            
+            const targetTab = document.getElementById(`tab-${tabId}`);
+            const bottomNav = document.getElementById(`nav-${tabId}`);
+            const topNav = document.getElementById(`top-nav-${tabId}`);
+
+            if (targetTab) targetTab.classList.add('active');
+            if (bottomNav) bottomNav.classList.add('active');
+            if (topNav) topNav.classList.add('active');
+
+            if (tabId === 'deliveries') {
+                loadDeliveries();
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // --- Utilities ---
+        function showLoading(show) {
+            document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+        }
+
+        // --- Geolocation ---
+        function getGpsLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error("Geolocation is not supported by your browser"));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                    pos => {
+                        currentGps = {
+                            latitude: pos.coords.latitude,
+                            longitude: pos.coords.longitude,
+                            accuracyMetres: Math.round(pos.coords.accuracy),
+                            mockLocation: false // Hard to detect reliably in pure JS, setting default
+                        };
+                        resolve(currentGps);
+                    },
+                    err => {
+                        reject(err);
+                    },
+                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                );
+            });
+        }
+
+        // --- Check-In Tab Logic ---
+        async function initCheckInTab() {
+            try {
+                document.getElementById('gpsStatusText').textContent = "Acquiring GPS...";
+                await getGpsLocation();
+                document.getElementById('gpsStatusText').textContent = `GPS Ready (${currentGps.accuracyMetres}m accuracy)`;
+                document.getElementById('gpsStatusText').style.color = "var(--green)";
+            } catch (err) {
+                document.getElementById('gpsStatusText').textContent = "GPS Failed. Check permissions.";
+                document.getElementById('gpsStatusText').style.color = "var(--red)";
+            }
+            
+            checkDutyStatus();
+        }
+
+        async function checkDutyStatus() {
+            if (!currentUser) return;
+            try {
+                showLoading(true);
+                const res = await fetch(`/api/agents/${currentUser.id}/status`);
+                if (res.ok) {
+                    const data = await res.json();
+                    isCheckedIn = data.checkedIn;
+                    activeSos = data.activeSos || false;
+                    renderDutyStatus(data);
+                    if (activeSos) {
+                        updateSosUI(true);
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching status", err);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function renderDutyStatus(statusData) {
+            const container = document.getElementById('checkInActions');
+            const badge = document.getElementById('dutyBadge');
+            const badgeText = document.getElementById('dutyBadgeText');
+            
+            container.innerHTML = '';
+            document.getElementById('checkInError').textContent = '';
+
+            if (statusData.checkedOutAt) {
+                // Already checked out for the day (or session)
+                badge.className = 'status-badge status-inactive';
+                badgeText.textContent = "Checked Out";
+                
+                const msg = document.createElement('div');
+                msg.textContent = `Checked out. Worked ${Math.floor(statusData.workedMinutes / 60) || 0} hours ${statusData.workedMinutes % 60 || 0} minutes.`;
+                msg.style.fontWeight = '500';
+                container.appendChild(msg);
+                stopTracking();
+            }
+            else if (statusData.checkedIn) {
+                // Checked In
+                badge.className = 'status-badge status-active';
+                badge.innerHTML = `<div class="pulse-dot"></div><span id="dutyBadgeText">Checked In</span>`;
+                
+                const timeStr = statusData.checkInAt ? new Date(statusData.checkInAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '...';
+                
+                const msg = document.createElement('div');
+                msg.textContent = `Live tracking active (Since ${timeStr})`;
+                msg.style.marginBottom = '16px';
+                msg.style.color = 'var(--green)';
+                msg.style.fontWeight = '600';
+                container.appendChild(msg);
+
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-amber';
+                btn.textContent = 'CHECK OUT';
+                btn.onclick = handleCheckOut;
+                container.appendChild(btn);
+                
+                startTracking();
+            } else {
+                // Not Checked In
+                badge.className = 'status-badge status-inactive';
+                badgeText.textContent = "Not Checked In";
+
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-green';
+                btn.textContent = currentGps ? `Check In` : 'Acquiring GPS...';
+                btn.disabled = !currentGps;
+                btn.onclick = handleCheckIn;
+                container.appendChild(btn);
+            }
+        }
+
+        async function handleCheckIn() {
+            if (!currentGps) return;
+            
+            document.getElementById('checkInError').textContent = '';
+            showLoading(true);
+            try {
+                const res = await fetch(`/api/agents/${currentUser.id}/check-in`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentGps)
+                });
+                const data = await res.json();
+                
+                if (res.ok && data.allowed) {
+                    checkDutyStatus(); // reload status
+                } else {
+                    let err = data.message || "Check-in failed.";
+                    if (data.status === 'TOO_FAR') err = `Too far from branch. ${data.message}`;
+                    if (data.status === 'MOCK_LOCATION') err = `Mock location detected!`;
+                    document.getElementById('checkInError').textContent = err;
+                }
+            } catch (err) {
+                document.getElementById('checkInError').textContent = "Network error during check-in.";
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function handleCheckOut() {
+            document.getElementById('checkInError').textContent = '';
+            showLoading(true);
+            try {
+                const res = await fetch(`/api/agents/${currentUser.id}/check-out`, {
+                    method: 'POST'
+                });
+                if (res.ok) {
+                    checkDutyStatus();
+                } else {
+                    document.getElementById('checkInError').textContent = "Check-out failed.";
+                }
+            } catch (err) {
+                document.getElementById('checkInError').textContent = "Network error during check-out.";
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function startTracking() {
+            if (pingInterval) return; // already tracking
+
+            // Send ping every 30 seconds
+            pingInterval = setInterval(sendPing, 30000);
+            
+            if (navigator.geolocation) {
+                trackingWatchId = navigator.geolocation.watchPosition(pos => {
+                    currentGps = {
+                        latitude: pos.coords.latitude,
+                        longitude: pos.coords.longitude,
+                        accuracyMetres: Math.round(pos.coords.accuracy),
+                        mockLocation: false
+                    };
+                }, err => {
+                    console.warn("Watch position error", err);
+                }, { enableHighAccuracy: true });
+            }
+        }
+
+        function stopTracking() {
+            if (pingInterval) {
+                clearInterval(pingInterval);
+                pingInterval = null;
+            }
+            if (trackingWatchId !== null && navigator.geolocation) {
+                navigator.geolocation.clearWatch(trackingWatchId);
+                trackingWatchId = null;
+            }
+        }
+
+        async function sendPing() {
+            if (!currentGps || !isCheckedIn) return;
+            try {
+                await fetch(`/api/agents/${currentUser.id}/ping`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        latitude: currentGps.latitude,
+                        longitude: currentGps.longitude,
+                        accuracyMetres: currentGps.accuracyMetres,
+                        simulated: false
+                    })
+                });
+            } catch(e) {
+                console.warn("Ping failed", e);
+            }
+        }
+
+        // --- Deliveries Tab Logic ---
+        async function loadDeliveries() {
+            const list = document.getElementById('deliveriesList');
+            list.innerHTML = '<div style="text-align:center; padding: 20px;">Loading...</div>';
+            
+            try {
+                const res = await fetch(`/api/agents/${currentUser.id}/orders`);
+                if (res.ok) {
+                    let orders = await res.json();
+                    
+                    // Sort: ASSIGNED first, then DELIVERED, then FAILED
+                    const orderPriority = { 'ASSIGNED': 1, 'DELIVERED': 2, 'FAILED': 3 };
+                    orders.sort((a, b) => orderPriority[a.status] - orderPriority[b.status]);
+                    
+                    renderDeliveries(orders);
+                } else {
+                    list.innerHTML = '<div class="error-msg" style="text-align:center;">Failed to load deliveries.</div>';
+                }
+            } catch (err) {
+                list.innerHTML = '<div class="error-msg" style="text-align:center;">Network error.</div>';
+            }
+        }
+
+        function renderDeliveries(orders) {
+            const list = document.getElementById('deliveriesList');
+            list.innerHTML = '';
+            
+            let delivered = 0;
+            let total = orders.length;
+
+            if (total === 0) {
+                list.innerHTML = '<div style="text-align:center; padding: 20px;">No deliveries assigned.</div>';
+            }
+
+            orders.forEach(order => {
+                if (order.status === 'DELIVERED') delivered++;
+                
+                const card = document.createElement('div');
+                card.className = `card delivery-card status-${order.status}`;
+                
+                let actionsHtml = '';
+                if (order.status === 'ASSIGNED') {
+                    actionsHtml = `
+                    <div class="delivery-actions">
+                        <button class="btn btn-sm btn-green" onclick="markDelivered(${order.id})">Delivered</button>
+                        <button class="btn btn-sm btn-red" onclick="markFailed(${order.id})">Failed</button>
+                    </div>`;
+                }
+
+                let statusLabel = order.status;
+                let statusColor = order.status === 'ASSIGNED' ? 'var(--amber)' : (order.status === 'DELIVERED' ? 'var(--green)' : 'var(--red)');
+
+                card.innerHTML = `
+                    <div class="delivery-header">
+                        <span class="customer-name">${order.customerName}</span>
+                        <span class="cylinder-count">${order.cylinderCount} Cylinders</span>
+                    </div>
+                    <div class="delivery-details">
+                        <div>${order.address}, ${order.areaName}</div>
+                        <a href="tel:${order.customerPhone}" class="phone-link">
+                            <svg style="width:16px; height:16px; fill:currentColor" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+                            ${order.customerPhone}
+                        </a>
+                        <div style="margin-top: 8px; font-weight: bold; color: ${statusColor}">${statusLabel}</div>
+                    </div>
+                    ${actionsHtml}
+                `;
+                list.appendChild(card);
+            });
+
+            // Update Progress
+            document.getElementById('deliveryProgressText').textContent = `${delivered} of ${total}`;
+            const pct = total === 0 ? 0 : (delivered / total) * 100;
+            document.getElementById('deliveryProgressBar').style.width = `${pct}%`;
+        }
+
+        async function markDelivered(orderId) {
+            const code = prompt("Enter 4-digit delivery code from customer:");
+            if (!code) return;
+            
+            showLoading(true);
+            try {
+                await getGpsLocation(); // Fresh GPS
+                const res = await fetch(`/api/orders/${orderId}/deliver`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agentId: currentUser.id,
+                        latitude: currentGps ? currentGps.latitude : 0,
+                        longitude: currentGps ? currentGps.longitude : 0,
+                        code: code
+                    })
+                });
+                const data = await res.json();
+                if (res.ok && data.accepted) {
+                    alert("Delivery successful!");
+                    loadDeliveries();
+                } else {
+                    alert("Delivery failed: " + (data.message || "Invalid code"));
+                }
+            } catch (err) {
+                alert("Network error.");
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function markFailed(orderId) {
+            const reason = prompt("Enter reason for failure (e.g. Customer not available):");
+            if (!reason) return;
+            
+            showLoading(true);
+            try {
+                const res = await fetch(`/api/orders/${orderId}/fail`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agentId: currentUser.id,
+                        reason: reason
+                    })
+                });
+                const data = await res.json();
+                if (res.ok && data.accepted) {
+                    alert("Order marked as failed.");
+                    loadDeliveries();
+                } else {
+                    alert("Failed to update status: " + data.message);
+                }
+            } catch (err) {
+                alert("Network error.");
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // --- SOS Tab Logic ---
+        const sosBtn = document.getElementById('sosBtn');
+        let sosPressTimer;
+        
+        sosBtn.addEventListener('touchstart', startSosPress);
+        sosBtn.addEventListener('touchend', cancelSosPress);
+        sosBtn.addEventListener('mousedown', startSosPress);
+        sosBtn.addEventListener('mouseup', cancelSosPress);
+        sosBtn.addEventListener('mouseleave', cancelSosPress);
+
+        function startSosPress(e) {
+            if (activeSos) return;
+            
+            sosBtn.style.transform = 'scale(0.9)';
+            sosPressTimer = setTimeout(() => {
+                triggerSos();
+            }, 2000);
+        }
+
+        function cancelSosPress(e) {
+            if (activeSos) return;
+            sosBtn.style.transform = 'scale(1)';
+            clearTimeout(sosPressTimer);
+        }
+
+        async function triggerSos() {
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            
+            try {
+                await getGpsLocation();
+            } catch(e) {} // continue even if GPS fails
+            
+            try {
+                const res = await fetch(`/api/agents/${currentUser.id}/sos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        latitude: currentGps ? currentGps.latitude : 0,
+                        longitude: currentGps ? currentGps.longitude : 0
+                    })
+                });
+                if (res.ok) {
+                    updateSosUI(true);
+                }
+            } catch (err) {
+                alert("Failed to send SOS. Check network.");
+            }
+        }
+
+        function updateSosUI(isActive) {
+            activeSos = isActive;
+            const btn = document.getElementById('sosBtn');
+            const msg = document.getElementById('sosStatusMsg');
+            const inst = document.getElementById('sosInstructions');
+            
+            if (isActive) {
+                btn.classList.add('active-sos');
+                btn.textContent = "SOS ACTIVE";
+                inst.style.display = 'none';
+                msg.innerHTML = "SOS Alert Sent!<br>Your manager has been notified.";
+            } else {
+                btn.classList.remove('active-sos');
+                btn.textContent = "SOS";
+                inst.style.display = 'block';
+                msg.innerHTML = "";
+            }
+        }
+
+        // --- Initialization ---
+        window.addEventListener('DOMContentLoaded', () => {
+            initCheckInTab();
+            loadDeliveries();
+        });
+
+    </script>
+</body>
+</html>

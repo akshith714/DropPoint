@@ -114,9 +114,6 @@ public final class Deliveries {
         @Column(nullable = false)
         private boolean active;
 
-        @Column(nullable = false)
-        private boolean seeded;
-
         @Column(name = "area_id")
         private Long areaId;
 
@@ -131,15 +128,15 @@ public final class Deliveries {
         public Customer(Long branchId, String name, String phone, CustomerType customerType,
                         String addressLine, double latitude, double longitude,
                         BuildingType buildingType, short floorNo, boolean hasLift,
-                        boolean active, boolean seeded) {
+                        boolean active) {
             this(branchId, name, phone, customerType, addressLine, latitude, longitude,
-                    buildingType, floorNo, hasLift, active, seeded, null, "AREA");
+                    buildingType, floorNo, hasLift, active, null, "AREA");
         }
 
         public Customer(Long branchId, String name, String phone, CustomerType customerType,
                         String addressLine, double latitude, double longitude,
                         BuildingType buildingType, short floorNo, boolean hasLift,
-                        boolean active, boolean seeded, Long areaId, String locationSource) {
+                        boolean active, Long areaId, String locationSource) {
             this.branchId = branchId;
             this.name = name;
             this.phone = phone;
@@ -151,7 +148,6 @@ public final class Deliveries {
             this.floorNo = floorNo;
             this.hasLift = hasLift;
             this.active = active;
-            this.seeded = seeded;
             this.areaId = areaId;
             this.locationSource = locationSource;
         }
@@ -175,14 +171,11 @@ public final class Deliveries {
         public short getFloorNo() { return floorNo; }
         public boolean isHasLift() { return hasLift; }
         public boolean isActive() { return active; }
-        public boolean isSeeded() { return seeded; }
         public Long getAreaId() { return areaId; }
         public String getLocationSource() { return locationSource; }
 
         public interface CustomerRepository extends JpaRepository<Customer, Long> {
             List<Customer> findByBranchIdAndActiveTrue(Long branchId);
-
-            List<Customer> findBySeededTrue();
 
             /** The phone column is not unique, so take the oldest match rather than failing. */
             Optional<Customer> findFirstByPhoneOrderByIdAsc(String phone);
@@ -251,9 +244,6 @@ public final class Deliveries {
         @Column(name = "failure_reason")
         private String failureReason;
 
-        @Column(nullable = false)
-        private boolean seeded;
-
         @Column(name = "area_id")
         private Long areaId;
 
@@ -291,11 +281,6 @@ public final class Deliveries {
             this.assignedAgentId = agentId;
             this.assignedAt = at;
             this.status = Status.ASSIGNED;
-        }
-
-        /** Marks this order as generated demo data, so the seed can be cleared again. */
-        public void markSeeded() {
-            this.seeded = true;
         }
 
         public void markDelivered(Instant at) {
@@ -343,7 +328,6 @@ public final class Deliveries {
         public String getEtaSource() { return etaSource; }
         public String getEtaExplanation() { return etaExplanation; }
         public String getFailureReason() { return failureReason; }
-        public boolean isSeeded() { return seeded; }
         public Long getAreaId() { return areaId; }
         public String getImportBatch() { return importBatch; }
 
@@ -353,83 +337,13 @@ public final class Deliveries {
 
             List<DeliveryOrder> findByBranchIdAndStatusInOrderByBookedAtDesc(Long branchId, List<Status> statuses);
 
-
             List<DeliveryOrder> findByAssignedAgentIdAndStatusOrderByAssignedAtAsc(Long agentId, Status status);
 
-            List<DeliveryOrder> findByBranchIdAndDeliveredAtAfterOrderByDeliveredAtDesc(Long branchId, Instant after);
-
-            List<DeliveryOrder> findBySeededTrue();
+            List<DeliveryOrder> findByAssignedAgentId(Long agentId);
         }
     }
 
-    @Entity
-    @Table(name = "delivery_proof")
-    public static class DeliveryProof {
 
-        @Id
-        @GeneratedValue(strategy = GenerationType.IDENTITY)
-        private Long id;
-
-        @Column(name = "order_id", nullable = false, unique = true)
-        private Long orderId;
-
-        @Column(name = "agent_id", nullable = false)
-        private Long agentId;
-
-        @Column(name = "recorded_at", nullable = false)
-        private Instant recordedAt;
-
-        @Column(nullable = false)
-        private double latitude;
-
-        @Column(nullable = false)
-        private double longitude;
-
-        @Column(name = "distance_m", nullable = false)
-        private double distanceM;
-
-        @Column(name = "code_matched", nullable = false)
-        private boolean codeMatched;
-
-        @Column(nullable = false)
-        private String verdict;
-
-        @Column(name = "late_minutes")
-        private Double lateMinutes;
-
-        protected DeliveryProof() {
-            // required by JPA
-        }
-
-        public DeliveryProof(Long orderId, Long agentId, Instant recordedAt, double latitude,
-                             double longitude, double distanceM, boolean codeMatched,
-                             String verdict, Double lateMinutes) {
-            this.orderId = orderId;
-            this.agentId = agentId;
-            this.recordedAt = recordedAt;
-            this.latitude = latitude;
-            this.longitude = longitude;
-            this.distanceM = distanceM;
-            this.codeMatched = codeMatched;
-            this.verdict = verdict;
-            this.lateMinutes = lateMinutes;
-        }
-
-        public Long getId() { return id; }
-        public Long getOrderId() { return orderId; }
-        public Long getAgentId() { return agentId; }
-        public Instant getRecordedAt() { return recordedAt; }
-        public double getDistanceM() { return distanceM; }
-        public String getVerdict() { return verdict; }
-        public Double getLateMinutes() { return lateMinutes; }
-
-        public interface DeliveryProofRepository extends JpaRepository<DeliveryProof, Long> {
-            List<DeliveryProof> findByVerdictOrderByRecordedAtDesc(String verdict);
-            long countByAgentIdAndVerdict(Long agentId, String verdict);
-
-            void deleteByOrderIdIn(java.util.Collection<Long> orderIds);
-        }
-    }
 
     @Entity
     @Table(name = "day_plan")

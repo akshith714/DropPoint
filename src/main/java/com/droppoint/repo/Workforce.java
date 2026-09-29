@@ -141,8 +141,6 @@ public final class Workforce {
 
         public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             Optional<Attendance> findByAgentIdAndWorkDate(Long agentId, LocalDate workDate);
-
-            List<Attendance> findByWorkDateBefore(LocalDate date);
         }
 
         protected Attendance() {
@@ -215,9 +213,7 @@ public final class Workforce {
         @Column(nullable = false)
         private String reason;
 
-        public interface CheckinAttemptRepository extends JpaRepository<CheckinAttempt, Long> {
-            List<CheckinAttempt> findTop20ByAgentIdOrderByAttemptedAtDesc(Long agentId);
-        }
+        public interface CheckinAttemptRepository extends JpaRepository<CheckinAttempt, Long> { }
 
         protected CheckinAttempt() {
             // required by JPA
@@ -303,10 +299,96 @@ public final class Workforce {
         public boolean isSuspicious() { return suspicious; }
 
         public interface LocationPingRepository extends JpaRepository<LocationPing, Long> {
-
             LocationPing findTopByAgentIdOrderByRecordedAtDesc(Long agentId);
 
-            List<LocationPing> findByAgentIdAndRecordedAtAfterOrderByRecordedAtAsc(Long agentId, Instant after);
+            @Query("""
+                    SELECT lp FROM Workforce$LocationPing lp
+                    WHERE lp.recordedAt = (
+                        SELECT MAX(lp2.recordedAt) FROM Workforce$LocationPing lp2
+                        WHERE lp2.agentId = lp.agentId
+                    )
+                    AND lp.agentId IN (
+                        SELECT a.agentId FROM Workforce$Attendance a
+                        WHERE a.workDate = :today AND a.checkOutAt IS NULL
+                    )
+                    """)
+            List<LocationPing> findLatestPingsForOnDutyAgents(@org.springframework.data.repository.query.Param("today") LocalDate today);
+        }
+    }
+
+    @Entity
+    @Table(name = "sos_alert")
+    public static class SosAlert {
+
+        public enum Status { ACTIVE, ACKNOWLEDGED, RESOLVED }
+
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
+
+        @Column(name = "agent_id", nullable = false)
+        private Long agentId;
+
+        @Column(name = "branch_id")
+        private Long branchId;
+
+        @Column(name = "triggered_at", nullable = false)
+        private Instant triggeredAt;
+
+        @Column
+        private Double latitude;
+
+        @Column
+        private Double longitude;
+
+        @Enumerated(EnumType.STRING)
+        @Column(nullable = false)
+        private Status status;
+
+        @Column(name = "acknowledged_by")
+        private Long acknowledgedBy;
+
+        @Column(name = "acknowledged_at")
+        private Instant acknowledgedAt;
+
+        @Column(name = "resolved_at")
+        private Instant resolvedAt;
+
+        @Column
+        private String note;
+
+        protected SosAlert() {
+            // required by JPA
+        }
+
+        public SosAlert(Long agentId, Long branchId, Instant triggeredAt,
+                         Double latitude, Double longitude) {
+            this.agentId = agentId;
+            this.branchId = branchId;
+            this.triggeredAt = triggeredAt;
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.status = Status.ACTIVE;
+        }
+
+        public void acknowledge(Long managerId, Instant at) {
+            this.acknowledgedBy = managerId;
+            this.acknowledgedAt = at;
+            this.status = Status.ACKNOWLEDGED;
+        }
+
+        public Long getId() { return id; }
+        public Long getAgentId() { return agentId; }
+        public Long getBranchId() { return branchId; }
+        public Instant getTriggeredAt() { return triggeredAt; }
+        public Double getLatitude() { return latitude; }
+        public Double getLongitude() { return longitude; }
+        public Status getStatus() { return status; }
+        public Long getAcknowledgedBy() { return acknowledgedBy; }
+        public Instant getAcknowledgedAt() { return acknowledgedAt; }
+
+        public interface SosAlertRepository extends JpaRepository<SosAlert, Long> {
+            List<SosAlert> findByStatusOrderByTriggeredAtDesc(Status status);
         }
     }
 }

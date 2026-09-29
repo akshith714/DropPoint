@@ -5,8 +5,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,8 @@ import com.droppoint.repo.Workforce.CheckinAttempt;
 import com.droppoint.repo.Workforce.CheckinAttempt.CheckinAttemptRepository;
 import com.droppoint.repo.Workforce.LocationPing;
 import com.droppoint.repo.Workforce.LocationPing.LocationPingRepository;
+import com.droppoint.repo.Workforce.SosAlert;
+import com.droppoint.repo.Workforce.SosAlert.SosAlertRepository;
 
 /**
  * Everything about an agent's working day: checking in at the branch, checking
@@ -47,20 +51,35 @@ public class AgentService {
 
     public record PingResponse(boolean accepted, String status, Double speedKmph, boolean suspicious) { }
 
+    public record SosResponse(Long id, String status, String message) { }
+
+    public record SosAlertView(Long id, Long agentId, String agentName, String agentPhone,
+                                Long branchId, String branchName,
+                                Instant triggeredAt, Double latitude, Double longitude,
+                                String status, Long acknowledgedBy, Instant acknowledgedAt) { }
+
+    public record AgentLocationView(Long agentId, String agentName, double latitude, double longitude,
+                                     Instant lastPingAt, Double speedKmph, boolean suspicious) { }
+
+    public record AgentStatusView(boolean checkedIn, Instant checkInAt, Instant checkOutAt,
+                                   Instant lastPingAt, boolean activeSos) { }
+
     private final AppUserRepository users;
     private final BranchRepository branches;
     private final AttendanceRepository attendances;
     private final CheckinAttemptRepository attempts;
     private final LocationPingRepository pings;
+    private final SosAlertRepository sosAlerts;
 
     public AgentService(AppUserRepository users, BranchRepository branches,
                         AttendanceRepository attendances, CheckinAttemptRepository attempts,
-                        LocationPingRepository pings) {
+                        LocationPingRepository pings, SosAlertRepository sosAlerts) {
         this.users = users;
         this.branches = branches;
         this.attendances = attendances;
         this.attempts = attempts;
         this.pings = pings;
+        this.sosAlerts = sosAlerts;
     }
 
     // ---- attendance ----
@@ -169,10 +188,111 @@ public class AgentService {
         return new PingResponse(true, suspicious ? "ACCEPTED_SUSPICIOUS" : "ACCEPTED", speed, suspicious);
     }
 
+    // ---- SOS ----
+
+    @Transactional
+    public SosResponse triggerSos(Long agentId, Double latitude, Double longitude) {
+        AppUser agent = requireAgent(agentId);
+
+        // Check if there's already an active SOS for this agent
+        List<SosAlert> active = sosAlerts.findByStatusOrderByTriggeredAtDesc(SosAlert.Status.ACTIVE);
+        for (SosAlert a : active) {
+            if (a.getAgentId().equals(agentId)) {
+                return new SosResponse(a.getId(), "ALREADY_ACTIVE",
+                        "You already have an active SOS alert. Your manager has been notified.");
+            }
+        }
+
+        SosAlert alert = sosAlerts.save(
+                new SosAlert(agentId, agent.getBranchId(), Instant.now(), latitude, longitude));
+
+        return new SosResponse(alert.getId(), "TRIGGERED",
+                "SOS alert sent. Your manager has been notified.");
+    }
+
     @Transactional(readOnly = true)
-    public List<LocationPing> todaysRoute(Long agentId) {
-        Instant startOfDay = LocalDate.now(BUSINESS_ZONE).atStartOfDay(BUSINESS_ZONE).toInstant();
-        return pings.findByAgentIdAndRecordedAtAfterOrderByRecordedAtAsc(agentId, startOfDay);
+    public List<SosAlertView> getActiveAlerts() {
+        List<SosAlert> alerts = sosAlerts.findByStatusOrderByTriggeredAtDesc(SosAlert.Status.ACTIVE);
+        Map<Long, AppUser> userCache = users.findAllById(
+                alerts.stream().map(SosAlert::getAgentId).distinct().toList()
+        ).stream().collect(Collectors.toMap(AppUser::getId, u -> u));
+
+        Map<Long, Branch> branchCache = branches.findAllById(
+                alerts.stream().map(SosAlert::getBranchId).filter(b -> b != null).distinct().toList()
+        ).stream().collect(Collectors.toMap(Branch::getId, b -> b));
+
+        return alerts.stream().map(a -> {
+            AppUser user = userCache.get(a.getAgentId());
+            Branch branch = a.getBranchId() != null ? branchCache.get(a.getBranchId()) : null;
+            return new SosAlertView(a.getId(), a.getAgentId(),
+                    user != null ? user.getFullName() : "Unknown",
+                    user != null ? user.getPhone() : "",
+                    a.getBranchId(), branch != null ? branch.getName() : "",
+                    a.getTriggeredAt(), a.getLatitude(), a.getLongitude(),
+                    a.getStatus().name(), a.getAcknowledgedBy(), a.getAcknowledgedAt());
+        }).toList();
+    }
+
+    @Transactional
+    public SosAlertView acknowledgeSos(Long alertId, Long managerId) {
+        SosAlert alert = sosAlerts.findById(alertId)
+                .orElseThrow(() -> new NoSuchElementException("SOS alert " + alertId + " not found"));
+
+        if (alert.getStatus() != SosAlert.Status.ACTIVE) {
+            throw new IllegalStateException("SOS alert is already " + alert.getStatus());
+        }
+
+        alert.acknowledge(managerId, Instant.now());
+
+        AppUser agent = users.findById(alert.getAgentId()).orElse(null);
+        Branch branch = alert.getBranchId() != null ? branches.findById(alert.getBranchId()).orElse(null) : null;
+
+        return new SosAlertView(alert.getId(), alert.getAgentId(),
+                agent != null ? agent.getFullName() : "Unknown",
+                agent != null ? agent.getPhone() : "",
+                alert.getBranchId(), branch != null ? branch.getName() : "",
+                alert.getTriggeredAt(), alert.getLatitude(), alert.getLongitude(),
+                alert.getStatus().name(), alert.getAcknowledgedBy(), alert.getAcknowledgedAt());
+    }
+
+    // ---- live location for dashboard ----
+
+    @Transactional(readOnly = true)
+    public List<AgentLocationView> getAgentLocations() {
+        LocalDate today = LocalDate.now(BUSINESS_ZONE);
+        List<LocationPing> latestPings = pings.findLatestPingsForOnDutyAgents(today);
+
+        Map<Long, AppUser> userCache = users.findAllById(
+                latestPings.stream().map(LocationPing::getAgentId).distinct().toList()
+        ).stream().collect(Collectors.toMap(AppUser::getId, u -> u));
+
+        return latestPings.stream().map(p -> {
+            AppUser user = userCache.get(p.getAgentId());
+            return new AgentLocationView(p.getAgentId(),
+                    user != null ? user.getFullName() : "Agent " + p.getAgentId(),
+                    p.getLatitude(), p.getLongitude(), p.getRecordedAt(),
+                    p.getSpeedKmph(), p.isSuspicious());
+        }).toList();
+    }
+
+    // ---- agent status (for mobile app) ----
+
+    @Transactional(readOnly = true)
+    public AgentStatusView getAgentStatus(Long agentId) {
+        LocalDate today = LocalDate.now(BUSINESS_ZONE);
+        Optional<Attendance> att = attendances.findByAgentIdAndWorkDate(agentId, today);
+
+        boolean checkedIn = att.isPresent() && att.get().getCheckOutAt() == null;
+        Instant checkInAt = att.map(Attendance::getCheckInAt).orElse(null);
+        Instant checkOutAt = att.map(Attendance::getCheckOutAt).orElse(null);
+
+        LocationPing lastPing = pings.findTopByAgentIdOrderByRecordedAtDesc(agentId);
+        Instant lastPingAt = lastPing != null ? lastPing.getRecordedAt() : null;
+
+        boolean activeSos = sosAlerts.findByStatusOrderByTriggeredAtDesc(SosAlert.Status.ACTIVE)
+                .stream().anyMatch(a -> a.getAgentId().equals(agentId));
+
+        return new AgentStatusView(checkedIn, checkInAt, checkOutAt, lastPingAt, activeSos);
     }
 
     // ---- shared ----
@@ -195,3 +315,4 @@ public class AgentService {
         };
     }
 }
+

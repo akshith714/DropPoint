@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
@@ -22,14 +23,14 @@ import org.springframework.transaction.annotation.Transactional;
 import com.droppoint.core.GeoPoint;
 import com.droppoint.core.Rules.EtaCalculator;
 import com.droppoint.core.Rules.ProofPolicy;
+import com.droppoint.repo.Deliveries.Area;
+import com.droppoint.repo.Deliveries.Area.AreaRepository;
 import com.droppoint.repo.Workforce.AppUser;
 import com.droppoint.repo.Workforce.AppUser.AppUserRepository;
 import com.droppoint.repo.Deliveries.Customer;
 import com.droppoint.repo.Deliveries.Customer.CustomerRepository;
 import com.droppoint.repo.Deliveries.DeliveryOrder;
 import com.droppoint.repo.Deliveries.DeliveryOrder.DeliveryOrderRepository;
-import com.droppoint.repo.Deliveries.DeliveryProof;
-import com.droppoint.repo.Deliveries.DeliveryProof.DeliveryProofRepository;
 import com.droppoint.repo.Workforce.LocationPing;
 import com.droppoint.repo.Workforce.LocationPing.LocationPingRepository;
 
@@ -58,102 +59,28 @@ public class OrderService {
     public record DeliveryResult(boolean accepted, String status, String message,
                                  long distanceMetres, Double lateMinutes, String orderStatus) { }
 
-    public record AgentOrderView(Long orderId, String orderNo, String customerName, String address,
-                                 String phone, int cylinderCount, String deliveryCode,
+    public record AgentOrderView(Long id, Long orderId, String orderNo, String customerName, String address,
+                                 String phone, String customerPhone, int cylinderCount, String deliveryCode,
                                  Double etaMinutes, Instant etaAt, String etaExplanation,
-                                 double latitude, double longitude) { }
+                                 double latitude, double longitude, String status, String areaName) { }
 
     private final DeliveryOrderRepository orders;
     private final CustomerRepository customers;
     private final AppUserRepository users;
     private final LocationPingRepository pings;
-    private final DeliveryProofRepository proofs;
+    private final AreaRepository areas;
     private final DistanceClient distances;
 
     public OrderService(DeliveryOrderRepository orders, CustomerRepository customers,
                         AppUserRepository users, LocationPingRepository pings,
-                        DeliveryProofRepository proofs,
+                        AreaRepository areas,
                         @Value("${droppoint.google.api-key:}") String googleApiKey) {
         this.orders = orders;
         this.customers = customers;
         this.users = users;
         this.pings = pings;
-        this.proofs = proofs;
+        this.areas = areas;
         this.distances = new DistanceClient(googleApiKey);
-    }
-
-    // ---- booking ----
-
-    @Transactional
-    public OrderView create(Long customerId, int cylinderCount) {
-        if (cylinderCount < 1 || cylinderCount > 20) {
-            throw new IllegalArgumentException("Cylinder count must be between 1 and 20");
-        }
-        Customer customer = customers.findById(customerId)
-                .orElseThrow(() -> new NoSuchElementException("Customer " + customerId + " not found"));
-        if (!customer.isActive()) {
-            throw new IllegalArgumentException("Customer " + customerId + " is not active");
-        }
-
-        Instant now = Instant.now();
-        String orderNo = "DP" + LocalDate.ofInstant(now, BUSINESS_ZONE).toString().replace("-", "")
-                + "-" + (1000 + RANDOM.nextInt(9000));
-        String code = String.valueOf(1000 + RANDOM.nextInt(9000));
-
-        DeliveryOrder saved = orders.save(new DeliveryOrder(orderNo, customer.getId(),
-                customer.getBranchId(), (short) cylinderCount, code, now));
-
-        return toView(saved, customer, null);
-    }
-
-    // ---- assignment and ETA ----
-
-    @Transactional
-    public OrderView assign(Long orderId, Long agentId) {
-        DeliveryOrder order = orders.findById(orderId)
-                .orElseThrow(() -> new NoSuchElementException("Order " + orderId + " not found"));
-        AppUser agent = users.findById(agentId)
-                .orElseThrow(() -> new NoSuchElementException("Agent " + agentId + " not found"));
-
-        if (agent.getRole() != AppUser.Role.AGENT || !agent.isActive()) {
-            throw new IllegalArgumentException("User " + agentId + " is not an active agent");
-        }
-        if (!order.getBranchId().equals(agent.getBranchId())) {
-            throw new IllegalArgumentException("Agent " + agentId + " belongs to a different branch");
-        }
-
-        order.assignTo(agentId, Instant.now());   // saved by dirty checking
-
-        Customer customer = customers.findById(order.getCustomerId()).orElseThrow();
-        applyEta(order, customer, agentId);
-        return toView(order, customer, agent.getFullName());
-    }
-
-    @Transactional(readOnly = true)
-    public List<OrderView> openOrders(Long branchId) {
-        List<OrderView> out = new ArrayList<>();
-        for (DeliveryOrder o : orders.findByBranchIdAndStatusInOrderByBookedAtDesc(branchId,
-                List.of(DeliveryOrder.Status.BOOKED, DeliveryOrder.Status.ASSIGNED))) {
-            Customer customer = customers.findById(o.getCustomerId()).orElseThrow();
-            String agentName = o.getAssignedAgentId() == null ? null
-                    : users.findById(o.getAssignedAgentId()).map(AppUser::getFullName).orElse(null);
-            out.add(toView(o, customer, agentName));
-        }
-        return out;
-    }
-
-    @Transactional
-    public OrderView refreshEta(Long orderId) {
-        DeliveryOrder order = orders.findById(orderId)
-                .orElseThrow(() -> new NoSuchElementException("Order " + orderId + " not found"));
-        if (order.getAssignedAgentId() == null) {
-            throw new IllegalArgumentException("Order " + orderId + " has no agent assigned");
-        }
-        Customer customer = customers.findById(order.getCustomerId()).orElseThrow();
-        applyEta(order, customer, order.getAssignedAgentId());
-        String agentName = users.findById(order.getAssignedAgentId())
-                .map(AppUser::getFullName).orElse(null);
-        return toView(order, customer, agentName);
     }
 
     // ---- delivery ----
@@ -188,8 +115,6 @@ public class OrderService {
                 : Math.round(Duration.between(order.getEtaAt(), now).toSeconds() / 6.0) / 10.0;
 
         order.markDelivered(now);
-        proofs.save(new DeliveryProof(order.getId(), agentId, now, latitude, longitude,
-                result.distanceMetres(), true, result.verdict().name(), lateMinutes));
 
         return new DeliveryResult(true, result.verdict().name(), result.note(),
                 distance, lateMinutes, order.getStatus().name());
@@ -214,20 +139,45 @@ public class OrderService {
     @Transactional(readOnly = true)
     public List<AgentOrderView> myOrders(Long agentId) {
         List<AgentOrderView> out = new ArrayList<>();
-        for (DeliveryOrder o : orders.findByAssignedAgentIdAndStatusOrderByAssignedAtAsc(
-                agentId, DeliveryOrder.Status.ASSIGNED)) {
-            Customer c = customers.findById(o.getCustomerId()).orElseThrow();
-            out.add(new AgentOrderView(o.getId(), o.getOrderNo(), c.getName(), c.getAddressLine(),
-                    c.getPhone(), o.getCylinderCount(), o.getDeliveryCode(),
-                    o.getEtaMinutes(), o.getEtaAt(), o.getEtaExplanation(),
-                    c.getLatitude(), c.getLongitude()));
-        }
-        return out;
-    }
+        Instant startOfToday = LocalDate.now(BUSINESS_ZONE).atStartOfDay(BUSINESS_ZONE).toInstant();
 
-    @Transactional(readOnly = true)
-    public List<DeliveryProof> suspiciousDeliveries() {
-        return proofs.findByVerdictOrderByRecordedAtDesc(ProofPolicy.Verdict.SUSPICIOUS.name());
+        List<DeliveryOrder> assignedOrders = orders.findByAssignedAgentId(agentId);
+        for (DeliveryOrder o : assignedOrders) {
+            boolean isAssigned = o.getStatus() == DeliveryOrder.Status.ASSIGNED;
+            boolean isCompletedToday = (o.getStatus() == DeliveryOrder.Status.DELIVERED || o.getStatus() == DeliveryOrder.Status.FAILED)
+                    && o.getDeliveredAt() != null && o.getDeliveredAt().isAfter(startOfToday);
+
+            if (isAssigned || isCompletedToday) {
+                Customer c = customers.findById(o.getCustomerId()).orElse(null);
+                if (c == null) continue;
+
+                String areaName = "";
+                if (c.getAreaId() != null) {
+                    areaName = areas.findById(c.getAreaId()).map(Area::getName).orElse("");
+                }
+
+                out.add(new AgentOrderView(
+                        o.getId(),
+                        o.getId(),
+                        o.getOrderNo(),
+                        c.getName(),
+                        c.getAddressLine(),
+                        c.getPhone(),
+                        c.getPhone(),
+                        o.getCylinderCount(),
+                        o.getDeliveryCode(),
+                        o.getEtaMinutes(),
+                        o.getEtaAt(),
+                        o.getEtaExplanation(),
+                        c.getLatitude(),
+                        c.getLongitude(),
+                        o.getStatus().name(),
+                        areaName
+                ));
+            }
+        }
+        out.sort(Comparator.comparing((AgentOrderView v) -> "ASSIGNED".equals(v.status()) ? 0 : 1));
+        return out;
     }
 
     // ---- shared ----

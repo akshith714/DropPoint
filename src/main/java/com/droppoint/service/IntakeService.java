@@ -136,7 +136,7 @@ public class IntakeService {
                         Customer.CustomerType.valueOf(r.type()), r.address(),
                         at.latitude(), at.longitude(),
                         Customer.BuildingType.INDEPENDENT, (short) 0, false,
-                        true, false, area.getId(), at.source()));
+                        true, area.getId(), at.source()));
                 newCustomers++;
             }
 

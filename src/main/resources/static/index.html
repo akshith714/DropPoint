@@ -3,160 +3,1194 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DropPoint</title>
+<title>DropPoint — Operations & Multi-Role Portal</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-  :root { --ink:#1c2733; --soft:#5a6875; --rule:#dde3e9; --paper:#f6f8fa;
-          --blue:#1f6e8c; --green:#1e6b47; --red:#b3261e; }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui,sans-serif; background:var(--paper);
-         color:var(--ink); line-height:1.6; }
-  .wrap { max-width:720px; margin:0 auto; padding:40px 20px 80px; }
-  h1 { font-size:2rem; margin:0 0 6px; }
-  .pitch { font-size:1.1rem; color:var(--soft); margin:0 0 30px; }
-  .step { background:#fff; border:1px solid var(--rule); border-radius:12px;
-          padding:20px 22px; margin-bottom:14px; opacity:0.45; }
-  .step.active { opacity:1; border-color:var(--blue); }
-  .step.done { opacity:1; }
-  .step h2 { font-size:1.05rem; margin:0 0 4px; display:flex; align-items:center; gap:10px; }
-  .num { background:var(--ink); color:#fff; width:26px; height:26px; border-radius:50%;
-         display:grid; place-items:center; font-size:0.85rem; flex:none; }
-  .step.done .num { background:var(--green); }
-  .why { color:var(--soft); font-size:0.95rem; margin:0 0 14px; }
-  button { padding:10px 16px; margin:0 8px 8px 0; border:0; border-radius:8px;
-           background:var(--blue); color:#fff; font-size:0.95rem; cursor:pointer; }
-  button.grey { background:#fff; border:1px solid var(--rule); color:var(--ink); }
-  button:disabled { opacity:0.4; cursor:default; }
-  .out { margin-top:12px; padding:12px 14px; border-radius:8px; font-size:0.95rem;
-         background:var(--paper); border-left:4px solid var(--rule); white-space:pre-wrap; }
-  .out.yes { border-left-color:var(--green); }
-  .out.no  { border-left-color:var(--red); }
-  .links { margin-top:26px; font-size:0.9rem; color:var(--soft); }
-  .links a { color:var(--blue); margin-right:16px; }
+  :root {
+    --ink: #1c2733;
+    --soft: #5a6875;
+    --rule: #dde3e9;
+    --paper: #f6f8fa;
+    --blue: #1f6e8c;
+    --green: #1e6b47;
+    --amber: #9a6a00;
+    --red: #b3261e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.55;
+  }
+  header {
+    background: #fff;
+    border-bottom: 1px solid var(--rule);
+    padding: 12px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  header h1 { font-size: 1.25rem; margin: 0; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+  header nav { display: flex; align-items: center; gap: 14px; }
+  header nav a { color: var(--blue); text-decoration: none; font-size: 0.92rem; font-weight: 500; }
+  header nav a:hover { text-decoration: underline; }
+  
+  .user-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+  }
+  .role-pill {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .role-ADMIN { background: #e3f2fd; color: #0d47a1; border: 1px solid #90caf9; }
+  .role-OWNER { background: #f3e5f5; color: #4a148c; border: 1px solid #ce93d8; }
+  .role-MANAGER { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
+  .role-AGENT { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+  
+  .wrap { max-width: 1050px; margin: 0 auto; padding: 26px 20px 70px; }
+  
+  .section-desc { color: var(--soft); margin: 0 0 16px; font-size: 0.93rem; }
+  
+  .box {
+    background: #fff;
+    border: 1px solid var(--rule);
+    border-radius: 11px;
+    padding: 22px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  }
+  
+  h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--soft); margin: 0 0 14px; }
+  
+  button {
+    padding: 8px 15px;
+    margin: 0 6px 6px 0;
+    border: 0;
+    border-radius: 8px;
+    background: var(--blue);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  button.go { background: var(--green); }
+  button.grey { background: #fff; border: 1px solid var(--rule); color: var(--ink); }
+  button.danger { background: #fff; border: 1px solid #f8c4c1; color: var(--red); }
+  button.sm { padding: 5px 10px; font-size: 0.82rem; border-radius: 6px; margin-bottom: 0; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  
+  /* TABLE RESPONSIVE & PADDING FIX */
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    margin-bottom: 12px;
+  }
+  table { width: 100%; min-width: 800px; border-collapse: collapse; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: middle; white-space: nowrap; }
+  th { font-size: 0.74rem; color: var(--soft); text-transform: uppercase; letter-spacing: 0.04em; background: var(--paper); }
+  tr:last-child td { border-bottom: none; }
+  
+  input[type=text], input[type=number], input[type=date], input[type=password], textarea, select {
+    padding: 6px 9px;
+    border: 1px solid var(--rule);
+    border-radius: 7px;
+    font-size: 0.88rem;
+    color: var(--ink);
+    background: #fff;
+  }
+  table input[type=text] { width: 100%; min-width: 110px; max-width: 140px; }
+  table input[type=number] { width: 60px; }
+  table select { width: 100%; min-width: 110px; max-width: 140px; }
+  input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; }
+  textarea { width: 100%; min-height: 100px; font-family: monospace; font-size: 0.88rem; resize: vertical; }
+  
+  .agentcard { border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+  .agentcard h3 { margin: 0 0 4px; font-size: 1.02rem; display: flex; align-items: center; justify-content: space-between; }
+  .load { font-size: 0.83rem; color: var(--soft); font-weight: normal; }
+  .bar { height: 6px; background: var(--paper); border-radius: 99px; margin: 8px 0 12px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--blue); }
+  .bar i.full { background: var(--amber); }
+  .bar i.success { background: var(--green); }
+  
+  .arealine {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 0;
+    border-top: 1px dashed var(--rule);
+    font-size: 0.9rem;
+  }
+  .arealine b { min-width: 140px; }
+  .arealine span { color: var(--soft); flex: 1; }
+  .tag { font-size: 0.73rem; background: var(--paper); border: 1px solid var(--rule); border-radius: 99px; padding: 2px 8px; color: var(--soft); display: inline-block; }
+  
+  .summary { background: #eef5f8; border-left: 4px solid var(--blue); padding: 13px 16px; border-radius: 0 8px 8px 0; margin-bottom: 16px; white-space: pre-wrap; font-size: 0.93rem; }
+  .warn { background: #fdf4e3; border-left-color: var(--amber); }
+  .stats { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 14px; }
+  .stats b { font-size: 1.5rem; display: block; }
+  .stats span { color: var(--soft); font-size: 0.82rem; }
+  
+  .badge-assigned { font-weight: 600; color: var(--blue); }
+  .msg-banner { margin-top: 10px; font-size: 0.9rem; color: var(--soft); }
+  
+  .flex-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+  .flex-header h2 { margin: 0; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  @keyframes flash-sos {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  .sos-card {
+    background: #fff;
+    border: 2px solid var(--red);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 10px;
+  }
+  .sos-card .sos-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .sos-card .sos-agent {
+    font-weight: 700;
+    font-size: 1rem;
+  }
+  .sos-card .sos-time {
+    color: var(--soft);
+    font-size: 0.82rem;
+  }
+  .sos-card .sos-details {
+    font-size: 0.88rem;
+    color: var(--soft);
+    margin-bottom: 10px;
+  }
 </style>
 </head>
 <body>
+
+<header>
+  <h1>📍 DropPoint</h1>
+  <nav>
+    <div id="userInfo" class="user-badge">
+      <span id="userName">User</span>
+      <span id="userRole" class="role-pill">ROLE</span>
+    </div>
+    <button class="grey sm" onclick="logout()">Sign Out</button>
+    <a href="/assistant.html">Ask Assistant 💬</a>
+  </nav>
+</header>
+
 <div class="wrap">
 
-  <h1>DropPoint</h1>
-  <p class="pitch">Gas cylinder deliveries, tracked honestly. Attendance you can trust,
-     arrival times that include the climb to the 5th floor, and an AI that explains
-     what went wrong.</p>
-
-  <div class="step active" id="s1">
-    <h2><span class="num">1</span> Start fresh</h2>
-    <p class="why">Clears today so we can watch a full day happen in five minutes.</p>
-    <button onclick="step1()">Start</button>
-    <div class="out" id="o1" hidden></div>
+  <!-- ADMIN USER MANAGEMENT SECTION (ADMIN ONLY) -->
+  <div class="box" id="adminUserSection" style="display:none;">
+    <h2>👑 System User Management (Admin Only)</h2>
+    <p class="section-desc">Manage agency users, update logins, and assign system access roles (<b>ADMIN</b>, <b>OWNER</b>, <b>MANAGER</b>, <b>AGENT</b>).</p>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>System Role</th>
+            <th>Login PIN</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="userRows">
+          <tr><td colspan="5">Loading users…</td></tr>
+        </tbody>
+        <tfoot>
+          <tr style="background: var(--paper);">
+            <td><input type="text" id="newUserName" placeholder="Full name"></td>
+            <td><input type="text" id="newUserPhone" placeholder="Phone number"></td>
+            <td>
+              <select id="newUserRole">
+                <option value="AGENT">AGENT</option>
+                <option value="MANAGER">MANAGER</option>
+                <option value="OWNER">OWNER</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
+            </td>
+            <td><input type="text" id="newUserPin" value="1234" style="width:70px;"></td>
+            <td><button class="go sm" onclick="createUser()">+ Add User</button></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div id="userMsg" class="msg-banner"></div>
   </div>
 
-  <div class="step" id="s2">
-    <h2><span class="num">2</span> The agent checks in</h2>
-    <p class="why">No more paper register. Check-in only works at the branch, so nobody
-       can mark themselves present from home.</p>
-    <button class="grey" onclick="step2('home')">Try from home</button>
-    <button onclick="step2('branch')">Check in at the branch</button>
-    <div class="out" id="o2" hidden></div>
+  <!-- SECTION 1: AGENTS & REGULAR AREAS (ADMIN, MANAGER, OWNER) -->
+  <div class="box" id="agentsSection" style="display:none;">
+    <h2>1 · Agents & Regular Delivery Locations</h2>
+    <p class="section-desc">Manage agents, toggle in-today availability, and assign <b>Regular Delivery Locations</b> so the day plan automatically prioritizes their designated sectors.</p>
+    
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Daily Limit</th>
+            <th>Regular Delivery Locations</th>
+            <th>In Today</th>
+            <th>Live GPS</th>
+            <th>Assigned Today</th>
+            <th id="thActions">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="agentRows">
+          <tr><td colspan="8">Loading agents…</td></tr>
+        </tbody>
+        <tfoot id="tfootAddAgent">
+          <tr style="background: var(--paper);">
+            <td><input type="text" id="newName" placeholder="Full name"></td>
+            <td><input type="text" id="newPhone" placeholder="Phone number"></td>
+            <td><input type="number" id="newCap" value="40" min="1" max="200"></td>
+            <td>
+              <select id="newPrefAreas" multiple style="height:55px; font-size:0.82rem;" title="Hold Ctrl to select multiple">
+                <option value="">select areas…</option>
+              </select>
+              <div style="font-size:0.7rem; color:var(--soft);">Ctrl+click for multiple</div>
+            </td>
+            <td colspan="3"><span style="color:var(--soft); font-size:0.83rem;">New agent default</span></td>
+            <td><button class="go sm" onclick="addAgent()">+ Add Agent</button></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div id="agentMsg" class="msg-banner"></div>
   </div>
 
-  <div class="step" id="s3">
-    <h2><span class="num">3</span> The delivery is proved</h2>
-    <p class="why">The customer reads out a 4-digit code. Wrong code, no delivery.
-       Right code far from the address still counts, but the manager sees it flagged.</p>
-    <button class="grey" onclick="step3('wrong')">Wrong code</button>
-    <button onclick="step3('right')">Correct code at the door</button>
-    <div class="out" id="o3" hidden></div>
+  <!-- SECTION 2: TODAY'S ORDERS (ADMIN, MANAGER) -->
+  <div class="box" id="intakeSection" style="display:none;">
+    <h2>2 · Today's Orders</h2>
+    <p class="section-desc">Paste WhatsApp order logs or upload a text file. Preview the parsed orders before importing into the waiting pile.</p>
+    <div>
+      <textarea id="intakeText" placeholder="Paste order messages here...
+e.g. Ramesh Kumar, 9876543210, Kothapet, 2 cylinders"></textarea>
+    </div>
+    <div style="margin-top:10px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+      <button onclick="previewOrders()">Preview Orders</button>
+      <button class="go" id="importBtn" onclick="importOrders()" disabled>Import to Waiting Pile</button>
+      <input type="file" id="fileInput" accept=".txt,.csv,.json" style="display:none" onchange="handleFileSelect(event)">
+      <button class="grey" onclick="document.getElementById('fileInput').click()">Upload File</button>
+    </div>
+    <div id="intakePreview" style="margin-top:14px"></div>
+    <div id="intakeMsg" class="msg-banner"></div>
   </div>
 
-  <div class="step" id="s4">
-    <h2><span class="num">4</span> Ask the AI what is going on</h2>
-    <p class="why">It reads the real data, so it can name the agent who keeps arriving
-       late and the customers quietly slipping away.</p>
-    <button onclick="step4('Who was late most this month?')">Who is late?</button>
-    <button onclick="step4('Which customers have we lost and why?')">Who have we lost?</button>
-    <div class="out" id="o4" hidden></div>
+  <!-- SECTION 3: THE PLAN & HISTORICAL PROGRESS (ADMIN, MANAGER, OWNER) -->
+  <div class="box" id="planSection" style="display:none;">
+    <div class="flex-header">
+      <h2>3 · Plan & Historical Progress</h2>
+      <div>
+        <label style="font-size:0.85rem; color:var(--soft); margin-right:6px; font-weight:500;">Progress Date:</label>
+        <input type="date" id="progressDate" onchange="loadProgress(this.value)">
+      </div>
+    </div>
+    <p class="section-desc">Review delivery completion rates for any date, or generate and confirm today's area allocation plan.</p>
+    
+    <!-- Historical Progress Block -->
+    <div id="progressReportBlock" style="margin-bottom:20px;"></div>
+
+    <div id="planControlsBlock">
+      <div class="stats" id="stats"></div>
+      <div id="summary"></div>
+      <div id="planContent"></div>
+      <div style="margin-top:16px" id="planButtons">
+        <button onclick="makePlan()">Plan the day</button>
+        <button class="go" id="confirmBtn" onclick="confirmPlan()" disabled>Confirm and Assign</button>
+        <button class="grey" onclick="reopenPlan()">Reopen</button>
+      </div>
+      <div id="planMsg" class="msg-banner"></div>
+    </div>
   </div>
 
-  <p class="links">
-    <a href="/intake.html">Load today's orders</a>
-    <a href="/stats.html">Full numbers</a>
-  </p>
+  <!-- AGENT INDIVIDUAL GPS MODAL -->
+  <div id="gpsModalOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:12px; width:90%; max-width:650px; padding:22px; box-shadow:0 10px 25px rgba(0,0,0,0.25); display:flex; flex-direction:column; gap:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 id="gpsModalTitle" style="margin:0; font-size:1.1rem; color:var(--ink);">Agent Live GPS</h3>
+        <button class="grey sm" onclick="closeAgentGpsModal()">Close &times;</button>
+      </div>
+      <div id="gpsModalStatus" style="font-size:0.88rem; color:var(--soft);">Loading GPS data...</div>
+      <div id="gpsModalMap" style="height:380px; border-radius:10px; border:1px solid var(--rule);"></div>
+    </div>
+  </div>
+
+  <!-- SECTION 6: SOS ALERTS (MANAGER, OWNER) -->
+  <div class="box" id="sosSection" style="display:none;">
+    <div class="flex-header">
+      <h2>6 · SOS Emergency Alerts</h2>
+      <span id="sosCount" class="tag" style="background:#ffebee; color:var(--red); border:1px solid #ef9a9a; font-weight:700;">0 active</span>
+    </div>
+    <p class="section-desc">Emergency alerts triggered by delivery agents. Acknowledge to let the agent know you've been notified.</p>
+    <div id="sosBanner" style="display:none; background:#b3261e; color:#fff; padding:12px 16px; border-radius:8px; margin-bottom:14px; font-weight:600; animation: flash-sos 1s infinite;">
+      EMERGENCY — New SOS alert received!
+    </div>
+    <div id="sosCards"></div>
+    <div id="sosEmpty" style="color:var(--soft); font-size:0.9rem; padding:20px 0; text-align:center;">No active SOS alerts.</div>
+  </div>
+
+  <!-- SECTION 4: AGENT DELIVERY PORTAL (AGENT ROLE ONLY) -->
+
+  <div class="box" id="agentPortalSection" style="display:none;">
+    <h2>🚚 My Delivery Route Today</h2>
+    <p class="section-desc">Welcome! Here are your assigned cylinder deliveries for today. Update delivery statuses as you deliver.</p>
+    
+    <div id="agentSummaryCard" style="background:#eef5f8; border-left:4px solid var(--blue); padding:16px; border-radius:0 8px 8px 0; margin-bottom:20px;">
+      <div class="stats" style="margin:0;">
+        <div><b id="myTotalStops">0</b><span>My Assigned Stops</span></div>
+        <div><b id="myDeliveredStops" style="color:var(--green)">0</b><span>Delivered</span></div>
+        <div><b id="myPendingStops" style="color:var(--amber)">0</b><span>Pending</span></div>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Stop #</th>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Address / Area</th>
+            <th>Cylinders</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="myOrderRows">
+          <tr><td colspan="7">Loading your assigned orders…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="agentPortalMsg" class="msg-banner"></div>
+  </div>
+
 </div>
 
 <script>
-let orderId, agentId, code;
+let currentUser = null;
+let agents = [];
+let areas = [];
+let previewData = null;
 
-function show(n, text, ok) {
-  const out = document.getElementById('o' + n);
-  out.hidden = false;
-  out.textContent = text;
-  out.className = 'out ' + (ok === false ? 'no' : ok === true ? 'yes' : '');
-  if (ok !== false) {
-    document.getElementById('s' + n).className = 'step done';
-    const next = document.getElementById('s' + (n + 1));
-    if (next) next.className = 'step active';
+// Initialize Date Picker to Today's date (Asia/Kolkata)
+const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+document.getElementById('progressDate').value = todayStr;
+
+/* ================= AUTHENTICATION & ROLE ENFORCEMENT ================= */
+function checkAuth() {
+  const saved = localStorage.getItem('dp_user');
+  if (!saved) {
+    window.location.href = '/login.html';
+    return false;
   }
-}
-
-async function api(url, body) {
-  const res = await fetch(url, body === undefined ? { method: 'POST' } : {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-  });
-  return { ok: res.ok, data: await res.json() };
-}
-
-async function step1() {
-  const { data } = await api('/api/demo/reset');
-  orderId = data.waitingOrderId;
-  show(1, 'Ready. One order is waiting: ' + data.waitingCustomer, true);
-}
-
-async function step2(where) {
-  const at = where === 'home'
-    ? { latitude: 17.3616, longitude: 78.4747 }     // 8.4 km away
-    : { latitude: 17.3458, longitude: 78.5523 };    // at the branch
-  const body = { ...at, accuracyMetres: 12, mockLocation: false };
-  const { data } = await api('/api/agents/3/check-in', body);
-
-  if (!data.allowed) {
-    show(2, 'Refused. ' + data.message, false);
-    return;
+  try {
+    currentUser = JSON.parse(saved);
+    if (!currentUser || !currentUser.role) {
+      window.location.href = '/login.html';
+      return false;
+    }
+  } catch (e) {
+    window.location.href = '/login.html';
+    return false;
   }
-  await api('/api/agents/3/ping', { ...at, accuracyMetres: 12, simulated: false });
-  show(2, 'Checked in, ' + data.distanceMetres + ' m from the branch. Tracking starts now '
-        + 'and stops at check-out.', true);
-}
-
-// The order still has to reach an agent before it can be delivered. Until the day
-// plan assigns by area, the demo hands it to agent 3, who checked in at step 2.
-async function assignToCheckedInAgent() {
-  if (agentId) return true;
-  const { ok, data } = await api('/api/orders/' + orderId + '/assign/3');
-  if (!ok) return false;
-  agentId = data.agentId;
-  code = data.deliveryCode;
   return true;
 }
 
-async function step3(kind) {
-  if (!await assignToCheckedInAgent()) {
-    show(3, 'Could not hand the order to an agent.', false);
-    return;
-  }
-  const { data } = await api('/api/orders/' + orderId + '/deliver', {
-    agentId, latitude: 17.3712, longitude: 78.5580,
-    code: kind === 'wrong' ? '0000' : code
-  });
-  if (!data.accepted) { show(3, 'Blocked. ' + data.message, false); return; }
-  show(3, 'Delivered and verified at the customer\'s address. '
-        + 'The code matched and the phone was 0 m away.', true);
+function logout() {
+  localStorage.removeItem('dp_user');
+  window.location.href = '/login.html';
 }
 
-async function step4(question) {
-  show(4, 'Thinking…');
-  const { ok, data } = await api('/api/assistant/ask', { question });
-  show(4, ok ? data.answer + '\n\n(answered from live data using: '
-        + [...new Set(data.toolsUsed)].join(', ') + ')' : (data.error || 'Failed.'), ok);
+function applyUserRole() {
+  if (!currentUser) return;
+  
+  // Header badge
+  document.getElementById('userName').textContent = currentUser.name;
+  const roleEl = document.getElementById('userRole');
+  roleEl.textContent = currentUser.role;
+  roleEl.className = 'role-pill role-' + currentUser.role;
+  
+  const role = currentUser.role;
+  
+  /* STRICT ROLE ISOLATION:
+     - AGENT: HIDE Sections 1, 2, and 3 completely! SHOW ONLY Agent Portal.
+     - OWNER: SHOW Section 1 (read-only) and Section 3 (read-only progress summary). HIDE Section 2 and Admin.
+     - MANAGER: SHOW Section 1, Section 2, Section 3. HIDE Admin user section and Agent portal.
+     - ADMIN: SHOW Admin section, Section 1, Section 2, Section 3. HIDE Agent portal.
+  */
+  
+  document.getElementById('adminUserSection').style.display = (role === 'ADMIN') ? 'block' : 'none';
+  document.getElementById('agentsSection').style.display = (role === 'ADMIN' || role === 'MANAGER' || role === 'OWNER') ? 'block' : 'none';
+  document.getElementById('intakeSection').style.display = (role === 'ADMIN' || role === 'MANAGER') ? 'block' : 'none';
+  document.getElementById('planSection').style.display = (role === 'ADMIN' || role === 'MANAGER' || role === 'OWNER') ? 'block' : 'none';
+  document.getElementById('planButtons').style.display = (role === 'ADMIN' || role === 'MANAGER') ? 'block' : 'none';
+  document.getElementById('thActions').style.display = (role === 'OWNER') ? 'none' : 'table-cell';
+  document.getElementById('tfootAddAgent').style.display = (role === 'ADMIN' || role === 'MANAGER') ? 'table-footer-group' : 'none';
+  
+  // SOS Section — visible to ADMIN, MANAGER, OWNER
+  document.getElementById('sosSection').style.display = (role === 'ADMIN' || role === 'MANAGER' || role === 'OWNER') ? 'block' : 'none';
+  
+  // Agent Portal is ONLY for AGENT role
+  document.getElementById('agentPortalSection').style.display = (role === 'AGENT') ? 'block' : 'none';
+
+  if (role === 'ADMIN') {
+    loadUsers();
+  }
+  if (role === 'AGENT') {
+    window.location.href = '/mobile.html';
+    return;
+  }
+  if (role === 'ADMIN' || role === 'MANAGER' || role === 'OWNER') {
+    loadSosAlerts();
+    // Poll every 10 seconds for SOS alerts (only when tab is visible)
+    setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadSosAlerts();
+      }
+    }, 10000);
+  }
 }
+
+/* ================= ADMIN USER MANAGEMENT ================= */
+async function loadUsers() {
+  try {
+    const users = await fetch('/api/admin/users').then(r => r.json());
+    renderUserTable(users);
+  } catch(e) {
+    document.getElementById('userRows').innerHTML = '<tr><td colspan="5">Error loading users.</td></tr>';
+  }
+}
+
+function renderUserTable(users) {
+  const tbody = document.getElementById('userRows');
+  if (!users || users.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5">No users found.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = users.map(u => `
+    <tr>
+      <td><b>${escapeHtml(u.name)}</b></td>
+      <td>${escapeHtml(u.phone)}</td>
+      <td><span class="role-pill role-${u.role}">${u.role}</span></td>
+      <td><code>${escapeHtml(u.pin || '1234')}</code></td>
+      <td>
+        ${u.phone !== '0000000000' ? `<button class="danger sm" onclick="deleteUser(${u.id})">Deactivate</button>` : '<span style="color:var(--soft); font-size:0.8rem;">System Root</span>'}
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function createUser() {
+  const name = document.getElementById('newUserName').value.trim();
+  const phone = document.getElementById('newUserPhone').value.trim();
+  const role = document.getElementById('newUserRole').value;
+  const pin = document.getElementById('newUserPin').value.trim() || '1234';
+  
+  if (!name || !phone) {
+    alert('Please enter name and phone number.');
+    return;
+  }
+  const res = await fetch('/api/admin/users', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name, phone, role, pin })
+  });
+  if (res.ok) {
+    document.getElementById('newUserName').value = '';
+    document.getElementById('newUserPhone').value = '';
+    document.getElementById('userMsg').textContent = 'User account created successfully.';
+    loadUsers();
+    loadAgents();
+  } else {
+    const out = await res.json();
+    alert(out.error || 'Failed to create user.');
+  }
+}
+
+async function deleteUser(id) {
+  if (!confirm('Deactivate this user account?')) return;
+  await fetch(`/api/admin/users/${id}/delete`, { method: 'POST' });
+  loadUsers();
+}
+
+/* ================= 1. AGENTS ================= */
+async function loadAreas() {
+  try {
+    areas = await fetch('/api/areas').then(r => r.json());
+    renderAreaDropdowns();
+  } catch (e) {
+    console.error('Error loading areas', e);
+  }
+}
+
+function renderAreaDropdowns() {
+  const newPrefSelect = document.getElementById('newPrefAreas');
+  if (newPrefSelect) {
+    newPrefSelect.innerHTML = areas.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+  }
+}
+
+async function loadAgents() {
+  if (currentUser && currentUser.role === 'AGENT') return; // Do not fetch agent list for agents
+  try {
+    agents = await fetch('/api/admin/agents').then(r => r.json());
+    renderAgentTable();
+  } catch (e) {
+    document.getElementById('agentRows').innerHTML = '<tr><td colspan="8">Error loading agents.</td></tr>';
+  }
+}
+
+function renderAgentTable() {
+  const tbody = document.getElementById('agentRows');
+  if (!agents || agents.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8">No active agents. Add one below.</td></tr>';
+    return;
+  }
+  
+  const isReadOnly = currentUser && currentUser.role === 'OWNER';
+
+  tbody.innerHTML = agents.map(a => {
+    const areaBadges = (a.preferredAreaNames && a.preferredAreaNames.length > 0)
+      ? a.preferredAreaNames.map(n => `<span class="tag" style="background:#e8f5e9; color:#1b5e20; border:1px solid #c8e6c9; margin:1px; display:inline-block;">${escapeHtml(n)}</span>`).join(' ')
+      : '<span style="color:var(--soft); font-size:0.8rem;">(None)</span>';
+
+    const multiAreaOptions = areas.map(area => {
+      const isSel = (a.preferredAreaIds || []).map(String).includes(String(area.id));
+      return `<option value="${area.id}" ${isSel ? 'selected' : ''}>${escapeHtml(area.name)}</option>`;
+    }).join('');
+
+    return `
+    <tr>
+      <td><input type="text" value="${escapeHtml(a.name)}" id="name-${a.id}" ${isReadOnly ? 'disabled' : ''}></td>
+      <td><input type="text" value="${escapeHtml(a.phone)}" id="phone-${a.id}" ${isReadOnly ? 'disabled' : ''}></td>
+      <td><input type="number" value="${a.cap}" min="1" max="200" id="cap-${a.id}" ${isReadOnly ? 'disabled' : ''}></td>
+      <td>
+        ${isReadOnly ? areaBadges : `
+        <select id="prefAreas-${a.id}" multiple style="height:55px; width:100%; font-size:0.8rem; padding:2px;">
+          ${multiAreaOptions}
+        </select>
+        <div style="font-size:0.7rem; color:var(--soft);">Ctrl+click for multiple</div>
+        `}
+      </td>
+      <td style="text-align:center"><input type="checkbox" ${a.available ? 'checked' : ''} id="avail-${a.id}" onchange="updateAgentAvail(${a.id}, this.checked)" ${isReadOnly ? 'disabled' : ''}></td>
+      <td>
+        <button class="go sm" style="padding:3px 9px; font-size:0.78rem;" onclick="openAgentGpsModal(${a.id}, '${escapeHtml(a.name)}')">GPS</button>
+      </td>
+      <td><span class="badge-assigned">${a.assignedToday}</span> stops</td>
+      ${!isReadOnly ? `
+      <td>
+        <button class="grey sm" onclick="saveAgent(${a.id})">Save</button>
+        <button class="danger sm" onclick="deleteAgent(${a.id})">Remove</button>
+      </td>` : ''}
+    </tr>
+  `}).join('');
+}
+
+async function updateAgentAvail(id, available) {
+  await fetch(`/api/admin/agents/${id}`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ available })
+  });
+  loadAgents();
+}
+
+async function saveAgent(id) {
+  const name = document.getElementById(`name-${id}`).value;
+  const phone = document.getElementById(`phone-${id}`).value;
+  const cap = Number(document.getElementById(`cap-${id}`).value);
+  const select = document.getElementById(`prefAreas-${id}`);
+  const preferredAreaIds = Array.from(select.selectedOptions).map(o => Number(o.value)).filter(v => v > 0);
+  
+  await fetch(`/api/admin/agents/${id}`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name, phone, cap, preferredAreaIds })
+  });
+  document.getElementById('agentMsg').textContent = 'Agent details & delivery locations updated.';
+  loadAgents();
+}
+
+async function addAgent() {
+  const name = document.getElementById('newName').value.trim();
+  const phone = document.getElementById('newPhone').value.trim();
+  const cap = Number(document.getElementById('newCap').value);
+  const select = document.getElementById('newPrefAreas');
+  const preferredAreaIds = Array.from(select.selectedOptions).map(o => Number(o.value)).filter(v => v > 0);
+  
+  if (!name || !phone) {
+    alert('Please provide name and phone.');
+    return;
+  }
+  const res = await fetch('/api/admin/agents', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name, phone, cap, preferredAreaIds })
+  });
+  if (res.ok) {
+    document.getElementById('newName').value = '';
+    document.getElementById('newPhone').value = '';
+    document.getElementById('agentMsg').textContent = 'Agent added successfully.';
+    loadAgents();
+  } else {
+    const out = await res.json();
+    alert(out.error || 'Failed to add agent.');
+  }
+}
+
+async function deleteAgent(id) {
+  if (!confirm('Remove this agent?')) return;
+  await fetch(`/api/admin/agents/${id}/delete`, { method: 'POST' });
+  loadAgents();
+}
+
+/* ================= 2. TODAY'S ORDERS ================= */
+function handleFileSelect(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('intakeText').value = e.target.result;
+    previewOrders();
+  };
+  reader.readAsText(file);
+}
+
+async function previewOrders() {
+  const text = document.getElementById('intakeText').value;
+  if (!text.trim()) {
+    document.getElementById('intakePreview').innerHTML = '';
+    document.getElementById('importBtn').disabled = true;
+    return;
+  }
+  document.getElementById('intakeMsg').textContent = 'Parsing preview…';
+  const res = await fetch('/api/intake/preview', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ text })
+  });
+  const data = await res.json();
+  previewData = data;
+  document.getElementById('intakeMsg').textContent = '';
+  
+  if (!res.ok) {
+    document.getElementById('intakePreview').innerHTML = `<p style="color:var(--red)">${data.error || 'Failed to preview.'}</p>`;
+    document.getElementById('importBtn').disabled = true;
+    return;
+  }
+  
+  const rows = data.rows || [];
+  const validCount = data.valid != null ? data.valid : rows.filter(r => !r.problem).length;
+  let html = `<p><b>Found ${validCount} valid order(s)</b> out of ${rows.length} line(s):</p>`;
+  if (rows.length > 0) {
+    html += `<div class="table-responsive"><table><thead><tr><th>Line</th><th>Customer</th><th>Phone</th><th>Area</th><th>Cylinders</th><th>Type</th><th>Status / Problem</th></tr></thead><tbody>`;
+    html += rows.map(r => `
+      <tr style="${r.problem ? 'background:#fdf4e3;' : ''}">
+        <td>${r.lineNo}</td>
+        <td>${escapeHtml(r.name || '—')}</td>
+        <td>${escapeHtml(r.phone || '—')}</td>
+        <td>${escapeHtml(r.area || '—')}</td>
+        <td>${r.cylinders || 1}</td>
+        <td>${escapeHtml(r.type || 'DOMESTIC')}</td>
+        <td>${r.problem ? `<span style="color:var(--red)">${escapeHtml(r.problem)}</span>` : '<span style="color:var(--green)">Valid</span>'}</td>
+      </tr>
+    `).join('');
+    html += `</tbody></table></div>`;
+  }
+  document.getElementById('intakePreview').innerHTML = html;
+  document.getElementById('importBtn').disabled = validCount === 0;
+}
+
+async function importOrders() {
+  const text = document.getElementById('intakeText').value;
+  if (!text.trim()) return;
+  document.getElementById('intakeMsg').textContent = 'Importing orders…';
+  const res = await fetch('/api/intake/import', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ text })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    document.getElementById('intakeText').value = '';
+    document.getElementById('intakePreview').innerHTML = '';
+    document.getElementById('importBtn').disabled = true;
+    document.getElementById('intakeMsg').textContent = `Successfully imported ${data.ordersCreated || 0} orders (${data.customersCreated || 0} new customers)!`;
+    loadPlan();
+    loadProgress(document.getElementById('progressDate').value);
+  } else {
+    document.getElementById('intakeMsg').textContent = data.error || 'Import failed.';
+  }
+}
+
+/* ================= 3. HISTORICAL PROGRESS & PLAN ================= */
+async function loadProgress(dateStr) {
+  if (currentUser && currentUser.role === 'AGENT') return; // Agents cannot view full progress
+  if (!dateStr) dateStr = todayStr;
+  try {
+    const res = await fetch(`/api/plan/progress?date=${dateStr}`);
+    if (!res.ok) return;
+    const report = await res.json();
+    renderProgressReport(report);
+  } catch (e) {
+    console.error('Error loading progress report', e);
+  }
+}
+
+function renderProgressReport(rep) {
+  const block = document.getElementById('progressReportBlock');
+  if (!rep) {
+    block.innerHTML = '';
+    return;
+  }
+  const isToday = rep.date === todayStr;
+  let html = `
+    <div style="background:var(--paper); border:1px solid var(--rule); border-radius:9px; padding:15px; margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span style="font-size:0.9rem; font-weight:600; color:var(--ink);">
+          Progress Summary for ${rep.date} ${isToday ? '(Today)' : ''}
+        </span>
+        <span class="tag" style="background:#fff;">Plan Status: <b>${rep.planStatus}</b></span>
+      </div>
+      <div class="stats" style="margin-bottom:10px;">
+        <div><b>${rep.deliveredOrders} / ${rep.assignedOrders}</b><span>Orders Delivered</span></div>
+        <div><b style="color:var(--green);">${rep.completionRate}%</b><span>Completion Rate</span></div>
+        <div><b>${rep.deliveredCylinders}</b><span>Cylinders Delivered</span></div>
+        ${rep.failedOrders ? `<div><b style="color:var(--red);">${rep.failedOrders}</b><span>Failed Orders</span></div>` : ''}
+        ${rep.carriedOver ? `<div><b style="color:var(--amber);">${rep.carriedOver}</b><span>Carried Over</span></div>` : ''}
+      </div>
+  `;
+  
+  if (rep.agentProgress && rep.agentProgress.length > 0) {
+    html += `<div style="font-size:0.83rem; font-weight:600; color:var(--soft); margin:12px 0 6px;">AGENT BREAKDOWN:</div>`;
+    html += rep.agentProgress.map(ap => {
+      const rate = ap.assigned === 0 ? 0 : Math.round(ap.delivered / ap.assigned * 100);
+      return `
+        <div style="background:#fff; border:1px solid var(--rule); border-radius:7px; padding:8px 12px; margin-bottom:6px; font-size:0.88rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <b>${escapeHtml(ap.agentName)}</b>
+            <span style="color:var(--soft); font-size:0.82rem;">${ap.delivered} of ${ap.assigned} delivered (${ap.cylindersDelivered} cyl)</span>
+          </div>
+          <div class="bar" style="margin:4px 0 2px;"><i class="${rate >= 100 ? 'success' : ''}" style="width:${rate}%"></i></div>
+        </div>
+      `;
+    }).join('');
+  }
+  
+  html += `</div>`;
+  block.innerHTML = html;
+}
+
+async function loadPlan() {
+  if (currentUser && currentUser.role === 'AGENT') return;
+  try {
+    const p = await fetch('/api/plan').then(r => r.ok ? r.json() : null);
+    renderPlan(p);
+  } catch (e) {
+    document.getElementById('planContent').innerHTML = '<p style="color:var(--soft)">Error loading plan.</p>';
+  }
+}
+
+function renderPlan(p) {
+  const msg = document.getElementById('planMsg');
+  if (!p) {
+    document.getElementById('planContent').innerHTML = '<p style="color:var(--soft)">No draft plan generated yet today. Import orders above and click "Plan the day".</p>';
+    document.getElementById('stats').innerHTML = '';
+    document.getElementById('summary').innerHTML = '';
+    document.getElementById('confirmBtn').disabled = true;
+    return;
+  }
+
+  document.getElementById('stats').innerHTML =
+      `<div><b>${p.totalOrders}</b><span>orders planned</span></div>`
+    + `<div><b>${p.agents.length}</b><span>agents working</span></div>`
+    + `<div><b>${p.totalCapacity}</b><span>total capacity</span></div>`
+    + (p.carriedIn ? `<div><b style="color:var(--amber)">${p.carriedIn}</b><span>carried from before</span></div>` : '')
+    + `<div><b style="color:${p.status === 'CONFIRMED' ? 'var(--green)' : 'var(--soft)'}">${p.status}</b><span>status</span></div>`;
+
+  document.getElementById('summary').innerHTML = p.summary ? `<div class="summary">${escapeHtml(p.summary)}</div>` : '';
+
+  const options = agents.filter(a => a.available)
+    .map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('');
+
+  const canEditPlan = currentUser && (currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER');
+
+  let html = p.agents.map(ag => {
+    const pct = Math.min(100, Math.round(ag.orders / ag.cap * 100));
+    return `
+      <div class="agentcard">
+        <h3>${escapeHtml(ag.agentName)}
+          <span class="load">${ag.orders} of ${ag.cap} stops · ${ag.cylinders} cylinders</span></h3>
+        <div class="bar"><i class="${pct >= 95 ? 'full' : ''}" style="width:${pct}%"></i></div>
+        ${ag.areas.map(a => `
+          <div class="arealine">
+            <b>${escapeHtml(a.areaName)}</b>
+            <span>${a.orders} orders · ${a.cylinders} cylinders
+                  ${a.partial ? '<span class="tag">part of the area</span>' : ''}</span>
+            ${(canEditPlan && p.status === 'DRAFT') ? `
+              <select onchange="moveAssignment(${a.assignmentId}, this.value)">
+                <option value="">move area to…</option>${options}
+              </select>` : ''}
+          </div>`).join('')}
+      </div>`;
+  }).join('');
+
+  if (p.unassigned && p.unassigned.length) {
+    html += `<div class="summary warn"><b>Not covered today</b><br>`
+          + p.unassigned.map(a => `${escapeHtml(a.areaName)} — ${a.orders} orders will carry over to tomorrow`).join('<br>')
+          + `</div>`;
+  }
+
+  document.getElementById('planContent').innerHTML = html || '<p style="color:var(--soft)">Nothing to plan — no orders are waiting.</p>';
+  document.getElementById('confirmBtn').disabled = !canEditPlan || p.status !== 'DRAFT' || p.agents.length === 0;
+  msg.textContent = '';
+}
+
+async function makePlan() {
+  document.getElementById('planMsg').textContent = 'Calculating plan…';
+  const res = await fetch('/api/plan', { method: 'POST' });
+  const p = await res.json();
+  if (res.ok) {
+    renderPlan(p);
+  } else {
+    document.getElementById('planMsg').textContent = p.error || 'Failed to make plan.';
+  }
+}
+
+async function moveAssignment(assignmentId, agentId) {
+  if (!agentId) return;
+  const res = await fetch('/api/plan/move', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ assignmentId, agentId: Number(agentId) })
+  });
+  const p = await res.json();
+  if (res.ok) renderPlan(p);
+  else document.getElementById('planMsg').textContent = p.error || 'Move failed.';
+}
+
+async function confirmPlan() {
+  const res = await fetch('/api/plan/confirm', { method: 'POST' });
+  const out = await res.json();
+  if (res.ok) {
+    document.getElementById('planMsg').textContent = `${out.ordersAssigned} orders assigned` + (out.carriedOver ? `, ${out.carriedOver} carried over.` : '.');
+    loadAgents();
+    loadPlan();
+    loadProgress(document.getElementById('progressDate').value);
+  } else {
+    document.getElementById('planMsg').textContent = out.error || 'Confirmation failed.';
+  }
+}
+
+async function reopenPlan() {
+  const res = await fetch('/api/plan/reopen', { method: 'POST' });
+  if (res.ok) {
+    loadPlan();
+    loadProgress(document.getElementById('progressDate').value);
+  }
+}
+
+/* ================= 4. AGENT PORTAL (AGENT ROLE ONLY) ================= */
+async function loadMyAgentOrders() {
+  if (!currentUser || currentUser.role !== 'AGENT') return;
+  try {
+    const list = await fetch(`/api/agents/${currentUser.id}/orders`).then(r => r.json());
+    renderMyAgentOrders(list);
+  } catch(e) {
+    document.getElementById('myOrderRows').innerHTML = '<tr><td colspan="7">Error loading your orders.</td></tr>';
+  }
+}
+
+function renderMyAgentOrders(list) {
+  const tbody = document.getElementById('myOrderRows');
+  if (!list || list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7">No assigned orders for today yet. Check back once manager confirms the plan!</td></tr>';
+    document.getElementById('myTotalStops').textContent = '0';
+    document.getElementById('myDeliveredStops').textContent = '0';
+    document.getElementById('myPendingStops').textContent = '0';
+    return;
+  }
+  
+  let delivered = list.filter(o => o.status === 'DELIVERED').length;
+  let pending = list.filter(o => o.status === 'ASSIGNED').length;
+  
+  document.getElementById('myTotalStops').textContent = list.length;
+  document.getElementById('myDeliveredStops').textContent = delivered;
+  document.getElementById('myPendingStops').textContent = pending;
+
+  tbody.innerHTML = list.map((o, idx) => `
+    <tr>
+      <td><b>#${idx + 1}</b></td>
+      <td>${escapeHtml(o.customerName)}</td>
+      <td>${escapeHtml(o.customerPhone)}</td>
+      <td>${escapeHtml(o.areaName || o.address)}</td>
+      <td><b>${o.cylinderCount}</b> cyl</td>
+      <td>
+        <span class="tag" style="${o.status === 'DELIVERED' ? 'background:#e8f5e9; color:#1b5e20;' : o.status === 'FAILED' ? 'background:#ffebee; color:#b71c1c;' : 'background:#e3f2fd; color:#0d47a1;'}">
+          ${o.status}
+        </span>
+      </td>
+      <td>
+        ${o.status === 'ASSIGNED' ? `
+          <button class="go sm" onclick="deliverOrder(${o.id})">Mark Delivered</button>
+          <button class="danger sm" onclick="failOrder(${o.id})">Fail</button>
+        ` : `<span style="color:var(--soft); font-size:0.83rem;">Completed</span>`}
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function deliverOrder(orderId) {
+  const res = await fetch(`/api/orders/${orderId}/deliver`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ agentId: currentUser.id, latitude: 17.3850, longitude: 78.4867, code: 'OTP123' })
+  });
+  if (res.ok) {
+    loadMyAgentOrders();
+  } else {
+    alert('Failed to mark delivered.');
+  }
+}
+
+async function failOrder(orderId) {
+  const reason = prompt('Reason for failure (e.g. Customer not available):');
+  if (!reason) return;
+  const res = await fetch(`/api/orders/${orderId}/fail`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ agentId: currentUser.id, reason })
+  });
+  if (res.ok) {
+    loadMyAgentOrders();
+  } else {
+    alert('Failed to update status.');
+  }
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+}
+
+/* ================= AGENT INDIVIDUAL GPS MODAL ================= */
+let modalMap = null;
+let modalMarker = null;
+let currentModalAgentId = null;
+let modalPollTimer = null;
+
+async function openAgentGpsModal(agentId, agentName) {
+  currentModalAgentId = agentId;
+  document.getElementById('gpsModalTitle').textContent = 'Live GPS — ' + agentName;
+  document.getElementById('gpsModalStatus').textContent = 'Fetching current location…';
+  document.getElementById('gpsModalOverlay').style.display = 'flex';
+
+  if (!modalMap) {
+    modalMap = L.map('gpsModalMap').setView([17.3850, 78.4867], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(modalMap);
+  }
+
+  setTimeout(() => { modalMap.invalidateSize(); }, 200);
+
+  await fetchAndRenderSingleAgentGps(agentId, agentName);
+
+  if (modalPollTimer) clearInterval(modalPollTimer);
+  modalPollTimer = setInterval(() => {
+    if (currentModalAgentId === agentId) {
+      fetchAndRenderSingleAgentGps(agentId, agentName);
+    }
+  }, 5000);
+}
+
+function closeAgentGpsModal() {
+  document.getElementById('gpsModalOverlay').style.display = 'none';
+  currentModalAgentId = null;
+  if (modalPollTimer) {
+    clearInterval(modalPollTimer);
+    modalPollTimer = null;
+  }
+}
+
+async function fetchAndRenderSingleAgentGps(agentId, agentName) {
+  try {
+    const locations = await fetch('/api/agents/locations').then(r => r.json());
+    const loc = locations.find(l => String(l.agentId) === String(agentId));
+    
+    if (!loc) {
+      document.getElementById('gpsModalStatus').innerHTML = '<span style="color:var(--amber)">Agent is offline or has not checked in today.</span>';
+      if (modalMarker) {
+        modalMap.removeLayer(modalMarker);
+        modalMarker = null;
+      }
+      return;
+    }
+
+    const timeStr = new Date(loc.lastPingAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const speedStr = loc.speedKmph != null ? ` &middot; Speed: ${loc.speedKmph} km/h` : '';
+    const suspStr = loc.suspicious ? ' <b style="color:var(--red)">(SUSPICIOUS MOVEMENT)</b>' : '';
+    
+    document.getElementById('gpsModalStatus').innerHTML = 
+      `<span style="color:var(--green); font-weight:600;">Active On-Duty</span> &middot; Last updated ${timeStr}${speedStr}${suspStr}`;
+
+    const latLng = [loc.latitude, loc.longitude];
+    modalMap.setView(latLng, 15);
+
+    const color = loc.suspicious ? '#b3261e' : '#1e6b47';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:18px;height:18px;background:${color};border:3px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.4);"></div>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9]
+    });
+
+    if (modalMarker) {
+      modalMarker.setLatLng(latLng);
+      modalMarker.setIcon(icon);
+    } else {
+      modalMarker = L.marker(latLng, { icon }).addTo(modalMap);
+    }
+    modalMarker.bindTooltip(escapeHtml(agentName), { permanent: true, direction: 'top' }).openTooltip();
+  } catch(e) {
+    document.getElementById('gpsModalStatus').textContent = 'Error loading GPS data.';
+  }
+}
+
+/* ================= 6. SOS ALERTS ================= */
+let previousSosCount = 0;
+
+async function loadSosAlerts() {
+  try {
+    const alerts = await fetch('/api/sos/active').then(r => r.json());
+    renderSosAlerts(alerts);
+  } catch(e) {
+    console.error('Error loading SOS alerts:', e);
+  }
+}
+
+function renderSosAlerts(alerts) {
+  const cardsDiv = document.getElementById('sosCards');
+  const emptyDiv = document.getElementById('sosEmpty');
+  const banner = document.getElementById('sosBanner');
+  const countBadge = document.getElementById('sosCount');
+
+  countBadge.textContent = alerts.length + ' active';
+
+  if (alerts.length === 0) {
+    cardsDiv.innerHTML = '';
+    emptyDiv.style.display = 'block';
+    banner.style.display = 'none';
+    previousSosCount = 0;
+    return;
+  }
+
+  emptyDiv.style.display = 'none';
+
+  // Flash banner if new alerts appeared
+  if (alerts.length > previousSosCount) {
+    banner.style.display = 'block';
+    // Try browser notification
+    if (Notification && Notification.permission === 'granted') {
+      new Notification('DropPoint SOS Alert', { body: alerts[0].agentName + ' triggered an emergency alert!' });
+    } else if (Notification && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+  } else {
+    banner.style.display = 'none';
+  }
+  previousSosCount = alerts.length;
+
+  cardsDiv.innerHTML = alerts.map(a => {
+    const time = new Date(a.triggeredAt).toLocaleString('en-IN', {
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      day: '2-digit', month: 'short'
+    });
+    const coords = (a.latitude && a.longitude)
+      ? `GPS: ${a.latitude.toFixed(5)}, ${a.longitude.toFixed(5)}`
+      : 'GPS: unavailable';
+
+    return `
+      <div class="sos-card">
+        <div class="sos-header">
+          <span class="sos-agent">${escapeHtml(a.agentName)}</span>
+          <span class="sos-time">${time}</span>
+        </div>
+        <div class="sos-details">
+          Phone: <a href="tel:${a.agentPhone}">${escapeHtml(a.agentPhone)}</a>
+          &middot; Branch: ${escapeHtml(a.branchName) || 'N/A'}
+          &middot; ${coords}
+        </div>
+        <button class="danger sm" onclick="acknowledgeSos(${a.id})">Acknowledge Alert</button>
+      </div>
+    `;
+  }).join('');
+}
+
+async function acknowledgeSos(alertId) {
+  if (!confirm('Acknowledge this SOS alert?')) return;
+  try {
+    const res = await fetch(`/api/sos/${alertId}/acknowledge`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ managerId: currentUser.id })
+    });
+    if (res.ok) {
+      loadSosAlerts();
+    } else {
+      const err = await res.json();
+      alert(err.error || 'Failed to acknowledge alert.');
+    }
+  } catch(e) {
+    alert('Error connecting to server.');
+  }
+}
+
+
+// Initial initialization
+async function init() {
+  if (!checkAuth()) return;
+  applyUserRole();
+  await loadAreas();
+  await loadAgents();
+  await loadPlan();
+  await loadProgress(todayStr);
+}
+init();
 </script>
 </body>
 </html>
