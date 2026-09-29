@@ -1,113 +1,102 @@
 # DropPoint — 5 minute demo script
 
-**Never paste more than one block at a time.** PowerShell evaluates variables when a
-block is parsed, not when each line runs. Note also that Windows PowerShell 5.1 does
-not enumerate an `Invoke-RestMethod` list when you pipe it inline - assign it to a
-variable first, as blocks A and E do, or the pipe yields one empty row.
+**Never paste more than one PowerShell block at a time.** PowerShell evaluates
+variables when a block is parsed, not when each line runs. Assign an
+`Invoke-RestMethod` list to a variable before piping it, or the pipe yields one empty row.
 
 ## Before they arrive
 
-1. Docker running: `docker ps` shows `droppoint-postgres`
-2. Terminal: `$env:GROQ_API_KEY = "..."` then `.\mvnw spring-boot:run`
-3. Check health: open `http://localhost:8081/api/demo/health`
-   - seededOrders 162, deliveryProofs 162, quietCustomers 12, groqKeySet true
-4. Reset: POST `http://localhost:8081/api/demo/reset`
-   - note the `waitingOrderId` it returns — you need it in step 5
-5. Open two tabs: dashboard `/`, control console `/control.html`
-6. Start on the dashboard tab
+1. Docker running.
+2. **Reset to the seed data.** This wipes the demo database, and the migrations reseed it
+   on start: 3 agents, 6 areas, 8 waiting orders.
+   ```powershell
+   docker compose down -v; docker compose up -d
+   ```
+3. Start the app: `.\mvnw spring-boot:run`. The Groq key comes from `local.properties`;
+   without it the assistant and the plan summary fall back to plain text.
+4. Check it is up: `http://localhost:8081/api/ping`
+5. Open two browser windows, both on `http://localhost:8081/login.html`:
+   - **Manager window**: normal size. Click the **Manager** quick-login.
+   - **Agent window**: press F12, toggle device mode (Ctrl+Shift+M) so it looks like a phone.
+     Click the **Agent** quick-login (Ramesh Kumar, agent 4).
+6. In the agent window's DevTools, open **Sensors** (⋮ → More tools → Sensors) and set
+   Location to `17.3688, 78.5247` (Dilsukhnagar). Real laptop GPS is often too weak for
+   check-in and too far from customers for a clean delivery.
+
+Use `localhost` for the agent window, not your laptop's IP from a phone: browsers only
+allow GPS on `https` or `localhost`.
 
 ## The five minutes
 
-### 1. Open on the dashboard (30 s)
-"This is what the owner sees. 57 deliveries in the last 30 days, 86% on time.
-The one number I'd act on today is here —" point at Mahesh Babu's late check-ins.
-"He's been late 16 times. Nobody else is late at all."
+### 1. Orders come in (45 s) — manager window, section 2
+"Orders arrive as WhatsApp messages or a spreadsheet. Nobody types coordinates."
 
-### 2. Attendance (45 s)
-"Agents used to sign a paper register. Now check-in only works at the branch."
+Click **Upload File** and pick `src/main/resources/sample_orders.csv`. The preview shows
+14 rows: 8 known customers, 6 new ones, grouped by area. Click **Import to Waiting Pile**.
+"New customers are placed by geocoding their address, or at the area centre if that fails."
 
-Run from PowerShell, from home coordinates:
+### 2. Plan the day (60 s) — section 3
+Click **Plan the day**.
+"Every agent has a daily cap. The plan splits areas across whoever is in today, keeps an
+agent on the area they know, and whatever doesn't fit carries over to tomorrow, first in line."
+Point at the summary paragraph: "That's written by the AI from the plan's numbers."
+
+Optionally move an area to another agent with the dropdown, then click **Confirm and Assign**.
+(Reopen is safe now: it releases undelivered orders and you can plan again.)
+
+### 3. Attendance (45 s) — PowerShell
+"Agents used to sign a paper register. Check-in only works near the branch, and every
+attempt is logged, including the refused ones."
+
+From Gachibowli, about 15 km away:
 ```powershell
-$b = @{ latitude = 17.3616; longitude = 78.4747; accuracyMetres = 15; mockLocation = $false } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://localhost:8081/api/agents/3/check-in -ContentType "application/json" -Body $b | Format-List
+$b = @{ latitude = 17.4401; longitude = 78.3489; accuracyMetres = 12; mockLocation = $false } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:8081/api/agents/4/check-in -ContentType "application/json" -Body $b | Format-List
 ```
-"Refused — 8.4 km from the branch." Then from the branch:
-```powershell
-$b = @{ latitude = 17.3458; longitude = 78.5523; accuracyMetres = 12; mockLocation = $false } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://localhost:8081/api/agents/3/check-in -ContentType "application/json" -Body $b | Format-List
-```
-"Accepted. And every attempt is logged, including the refused one."
+"Refused: TOO_FAR." Then in the **agent window**, Check-In tab, tap **Check In**. Accepted.
 
-### 3. Assignment and ETA (60 s) — tab: control console
-Hand the waiting DEMO- order (Priya Sharma) to Ravi, the agent who just checked in:
-```powershell
-$all = Invoke-RestMethod http://localhost:8081/api/orders
-$id = ($all | Where-Object { $_.orderNo -like 'DEMO-*' } | Select-Object -First 1).id
-Invoke-RestMethod -Method Post -Uri "http://localhost:8081/api/orders/$id/assign/3" | Format-List
-```
+(The branch radius is 10 km so the live check-in works from wherever you present. To
+refuse at a tighter distance, lower `branch.checkin_radius_m`.)
 
-Point at the ETA it comes back with: "Google would tell us the drive takes X
-minutes. This says X plus 15 — because Priya is on the 5th floor of a gated
-building and there are two cylinders to carry. That's the time that actually
-makes deliveries late, and no maps API knows it."
+### 4. Delivery proof (60 s) — agent window
+"The customer reads out a 4-digit code. Without it, the delivery doesn't count."
 
-### 4. Delivery proof (60 s)
-"The customer reads out a 4-digit code." One block at a time.
+Get Ramesh's codes in a third tab: `http://localhost:8081/api/agents/4/orders`
+("In production the customer gets this by SMS.")
 
-**A — pick up the order and the agent it went to**
-```powershell
-$all = Invoke-RestMethod http://localhost:8081/api/orders
-$o = $all | Where-Object { $_.orderNo -like 'DEMO-*' } | Select-Object -First 1
-$id = $o.id; $agent = $o.agentId
-"order $id, assigned to $($o.agentName) (agent $agent), code $($o.deliveryCode)"
-```
+On a Dilsukhnagar order, tap **Delivered**:
+- Type `0000`: "Blocked, wrong code. The order stays open."
+- Tap again and type the real code: "Delivery verified."
 
-**B — wrong code, right place**
-```powershell
-$b = @{ agentId = $agent; latitude = 17.3712; longitude = 78.5580; code = "0000" } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "http://localhost:8081/api/orders/$id/deliver" -ContentType "application/json" -Body $b | Format-List
-```
-"Blocked - WRONG_CODE. The order is still open, so he can try again."
+"If the code is right but the agent is more than 150 m from the address, it still counts
+but is flagged for the manager." (Change the Sensors location to show it.)
 
-**C — correct code, right place**
-```powershell
-$b = @{ agentId = $agent; latitude = 17.3712; longitude = 78.5580; code = $o.deliveryCode } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri "http://localhost:8081/api/orders/$id/deliver" -ContentType "application/json" -Body $b | Format-List
-```
-"VERIFIED, a few metres from her door. Beyond 150 m it still records the delivery -
-the agent gets paid - but the manager sees it."
+On another order tap **Failed** and pick **Nobody home** from the list.
 
-**D — the owner's numbers move on their own**
-```powershell
-(Invoke-RestMethod http://localhost:8081/api/dashboard).today | Format-List
-```
-"delivered_today just went up. Nobody typed that in anywhere."
+Back in the manager window, section 3 progress: delivered and failed counts have moved.
+"Nobody typed that in."
 
-**E — what the manager reviews**
-```powershell
-$flagged = Invoke-RestMethod http://localhost:8081/api/deliveries/suspicious
-$flagged | Select-Object -First 3 orderId, agentId, @{n='metresAway';e={[math]::Round($_.distanceM)}}, verdict, lateMinutes | Format-Table
-```
-"Right code, but 2 to 3 km from the address. That is the case worth a phone call."
+### 5. SOS (20 s, optional)
+Agent window, **SOS Alert** tab: press and hold the SOS button. Within a few seconds the alert appears in
+the manager window, section 6, with the agent's position. Click **Acknowledge Alert**.
 
-### 5. The AI (75 s) — tab: dashboard
-Click **Who was late most this month?**
-"Mahesh Babu, 16 late check-ins." Point at the `queried:` line.
-"That's the important part — it ran a real query. The model can't write SQL
-and can't see the database. It can only call six functions I wrote."
+### 6. The AI (60 s) — manager window, **Ask Assistant**
+Click **What is happening today?**, then **Which agent has the most failed deliveries this week?**
+"It ran a real query. The model can't write SQL and can't see the database. It can only
+call six read-only functions I wrote."
 
-Click **Which customers have we lost and why?**
-"Three or four customers, each compared against their own ordering rhythm.
-Anil Verma is 75 days quiet when he normally orders every 30 — and he had
-4 late deliveries. That's a call to make today, and nobody had to run a report."
+Don't ask about lost customers or monthly trends: a fresh reset has no history, and it
+will truthfully say there's no data.
 
 ## Closing line
 "Everything you saw runs on one Spring Boot service and one Postgres database.
-The business rules are plain Java with 40 tests behind them. Next steps are
-route planning across multiple stops, WhatsApp booking, and stock settlement."
+The business rules are plain Java with tests behind them. Next steps are route planning
+across stops, WhatsApp booking, and SMS delivery codes."
 
 ## If something breaks
-- Assistant errors → GROQ_API_KEY not set in this terminal
-- Delivery says NOT_ASSIGNED_AGENT → block A picked the wrong order; use the agent id block A printed
+- Assistant errors → the Groq key is missing from `local.properties`, or the free tier's
+  rate limit hit; wait 10 seconds and ask again
+- Check-in says LOW_ACCURACY → set a location in DevTools Sensors (step 6 above)
+- Delivery flagged thousands of km away → the browser had no location; set Sensors
 - Port 8081 busy → `Get-NetTCPConnection -LocalPort 8081 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }`
 - Anything unexplained → reset and carry on; never debug live

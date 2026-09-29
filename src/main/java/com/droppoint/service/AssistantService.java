@@ -44,14 +44,13 @@ public class AssistantService {
             not just the single worst one, then say which needs attention first.
             If the data does not answer the question, say exactly that. Never invent numbers,
             and copy dates exactly as the tool gives them.
-            Punctuality has two separate meanings: late CHECK-INS (an agent arriving late for work,
-            shown as late_checkins and avg_checkin_hour) and late DELIVERIES (an order arriving after
-            its ETA, shown as late_deliveries). When the owner just says "late", report both and say
-            which is the bigger problem.
+            "Late" means a late CHECK-IN: an agent arriving for work at 9 am or after, shown as
+            late_checkins and avg_checkin_hour. Delivery problems show up as FAILED deliveries,
+            with a failure_reason; failureBreakdown shows where and why they cluster.
             When asked whether a named customer is at risk of being lost, check quietCustomers as
             well as customerHistory before answering - how long they have been quiet against their
             usual refill gap is the evidence that matters.
-            For a quiet customer with no late or failed deliveries, do not say inactivity caused
+            For a quiet customer with no failed deliveries, do not say inactivity caused
             the churn. Say the likely reasons are moving away, switching supplier, or a piped-gas
             connection, and recommend a call to confirm.
             Write plain sentences and plain dashes for lists. No markdown, no asterisks, no headings.
@@ -163,7 +162,7 @@ public class AssistantService {
         return switch (name) {
             case "agentPunctuality" -> agentPunctuality(args.path("days").asInt(7));
             case "deliveryStats" -> deliveryStats(args.path("days").asInt(7));
-            case "lateBreakdown" -> lateBreakdown(args.path("days").asInt(30));
+            case "failureBreakdown" -> failureBreakdown(args.path("days").asInt(30));
             case "quietCustomers" -> quietCustomers(args.path("minDaysQuiet").asInt(30));
             case "customerHistory" -> customerHistory(args.path("name").asText(""));
             case "todaySnapshot" -> todaySnapshot();
@@ -202,22 +201,22 @@ public class AssistantService {
     /** The six functions the model is allowed to call. */
     private static final List<Map<String, Object>> TOOLS = List.of(
             tool("agentPunctuality",
-                 "Per-agent delivery punctuality and check-in times over the last N days. Use for questions about which agent is late, slow or best.",
+                 "Per-agent deliveries, failures and check-in times over the last N days. Use for questions about which agent is late, slow or best.",
                  Map.of("days", intParam("How many days back, default 7"))),
             tool("deliveryStats",
-                 "Headline totals over the last N days: delivered, failed, open, late and flagged deliveries.",
+                 "Headline totals over the last N days: delivered, failed and still open orders, and cylinders delivered.",
                  Map.of("days", intParam("How many days back, default 7"))),
-            tool("lateBreakdown",
-                 "Where late deliveries cluster, grouped by hour of day and by building type. Use for questions about WHY deliveries are late.",
+            tool("failureBreakdown",
+                 "Where failed deliveries cluster, grouped by reason, by area and by building type. Use for questions about WHY deliveries fail.",
                  Map.of("days", intParam("How many days back, default 30"))),
             tool("quietCustomers",
-                 "Customers who have not ordered recently, with their usual refill gap, late deliveries and failures. Use for churn or lost-customer questions.",
+                 "Customers who have not ordered recently, with their usual refill gap and failed deliveries. Use for churn or lost-customer questions.",
                  Map.of("minDaysQuiet", intParam("Minimum days since last order, default 30"))),
             tool("customerHistory",
                  "One customer's details and last 15 orders, found by partial name. Use when the owner names a customer.",
                  Map.of("name", Map.of("type", "string", "description", "Part of the customer name"))),
             tool("todaySnapshot",
-                 "Live status today: agents on duty, orders waiting, in progress, delivered, failed and flagged.",
+                 "Live status today: agents on duty, orders waiting, in progress, delivered and failed.",
                  Map.of()));
 
     private static Map<String, Object> intParam(String description) {
@@ -233,15 +232,14 @@ public class AssistantService {
 
     // ---- the only data the assistant can reach ----
 
-    /** Per-agent punctuality over the last N days. */
+    /** Per-agent deliveries, failures and check-in times over the last N days. */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> agentPunctuality(int days) {
         return jdbc.queryForList("""
                 SELECT u.full_name AS agent,
-                       count(p.id) AS deliveries,
-                       count(*) FILTER (WHERE p.late_minutes > 5) AS late_deliveries,
-                       round(CAST(avg(p.late_minutes) AS numeric), 1) AS avg_minutes_vs_eta,
-                       round(CAST(max(p.late_minutes) AS numeric), 1) AS worst_minutes_late,
+                       count(o.id) FILTER (WHERE o.status = 'DELIVERED') AS deliveries,
+                       count(o.id) FILTER (WHERE o.status = 'FAILED') AS failed_deliveries,
+                       count(o.id) FILTER (WHERE o.status = 'ASSIGNED') AS still_assigned,
                        (SELECT round(CAST(avg(EXTRACT(HOUR FROM a.check_in_at AT TIME ZONE 'Asia/Kolkata')
                                         + EXTRACT(MINUTE FROM a.check_in_at AT TIME ZONE 'Asia/Kolkata') / 60.0) AS numeric), 2)
                           FROM attendance a
@@ -252,11 +250,11 @@ public class AssistantService {
                            AND a.work_date >= CURRENT_DATE - CAST(? AS INTEGER)
                            AND EXTRACT(HOUR FROM a.check_in_at AT TIME ZONE 'Asia/Kolkata') >= 9) AS late_checkins
                   FROM app_user u
-                  LEFT JOIN delivery_proof p ON p.agent_id = u.id
-                       AND p.recorded_at >= now() - make_interval(days => ?)
-                 WHERE u.role = 'AGENT'
+                  LEFT JOIN orders o ON o.assigned_agent_id = u.id
+                       AND o.assigned_at >= now() - make_interval(days => ?)
+                 WHERE u.role = 'AGENT' AND u.active
                  GROUP BY u.id, u.full_name
-                 ORDER BY late_deliveries DESC
+                 ORDER BY late_checkins DESC, failed_deliveries DESC
                 """, days, days, days);
     }
 
@@ -267,46 +265,43 @@ public class AssistantService {
                 SELECT count(*) FILTER (WHERE o.status = 'DELIVERED') AS delivered,
                        count(*) FILTER (WHERE o.status = 'FAILED') AS failed,
                        count(*) FILTER (WHERE o.status IN ('BOOKED','ASSIGNED')) AS still_open,
-                       (SELECT count(*) FROM delivery_proof p
-                         WHERE p.recorded_at >= now() - make_interval(days => ?)
-                           AND p.late_minutes > 5) AS late_deliveries,
-                       (SELECT round(CAST(avg(p.late_minutes) AS numeric), 1) FROM delivery_proof p
-                         WHERE p.recorded_at >= now() - make_interval(days => ?)) AS avg_minutes_vs_eta,
-                       (SELECT count(*) FROM delivery_proof p
-                         WHERE p.recorded_at >= now() - make_interval(days => ?)
-                           AND p.verdict = 'SUSPICIOUS') AS flagged_deliveries
+                       COALESCE(sum(o.cylinder_count) FILTER (WHERE o.status = 'DELIVERED'), 0) AS cylinders_delivered
                   FROM orders o
                  WHERE o.booked_at >= now() - make_interval(days => ?)
-                """, days, days, days, days);
+                """, days);
     }
 
-    /** Where late deliveries cluster: by hour of day and by building type. */
+    /** Where failed deliveries cluster: by reason, by area and by building type. */
     @Transactional(readOnly = true)
-    public Map<String, Object> lateBreakdown(int days) {
-        List<Map<String, Object>> byHour = jdbc.queryForList("""
-                SELECT EXTRACT(HOUR FROM p.recorded_at AT TIME ZONE 'Asia/Kolkata') AS hour_of_day,
-                       count(*) AS deliveries,
-                       count(*) FILTER (WHERE p.late_minutes > 5) AS late,
-                       round(CAST(avg(p.late_minutes) AS numeric), 1) AS avg_minutes_vs_eta
-                  FROM delivery_proof p
-                 WHERE p.recorded_at >= now() - make_interval(days => ?)
-                 GROUP BY 1 HAVING count(*) >= 3 ORDER BY 1
+    public Map<String, Object> failureBreakdown(int days) {
+        List<Map<String, Object>> byReason = jdbc.queryForList("""
+                SELECT COALESCE(o.failure_reason, 'UNKNOWN') AS reason, count(*) AS failures
+                  FROM orders o
+                 WHERE o.status = 'FAILED' AND o.delivered_at >= now() - make_interval(days => ?)
+                 GROUP BY 1 ORDER BY 2 DESC
+                """, days);
+
+        List<Map<String, Object>> byArea = jdbc.queryForList("""
+                SELECT a.name AS area,
+                       count(*) AS attempted,
+                       count(*) FILTER (WHERE o.status = 'FAILED') AS failed
+                  FROM orders o JOIN area a ON a.id = o.area_id
+                 WHERE o.status IN ('DELIVERED','FAILED')
+                   AND o.delivered_at >= now() - make_interval(days => ?)
+                 GROUP BY a.name ORDER BY failed DESC
                 """, days);
 
         List<Map<String, Object>> byBuilding = jdbc.queryForList("""
                 SELECT c.building_type, c.customer_type,
-                       count(*) AS deliveries,
-                       count(*) FILTER (WHERE p.late_minutes > 5) AS late,
-                       round(CAST(avg(p.late_minutes) AS numeric), 1) AS avg_minutes_vs_eta,
-                       round(CAST(avg(o.handover_minutes) AS numeric), 1) AS avg_handover_minutes
-                  FROM delivery_proof p
-                  JOIN orders o ON o.id = p.order_id
-                  JOIN customer c ON c.id = o.customer_id
-                 WHERE p.recorded_at >= now() - make_interval(days => ?)
-                 GROUP BY 1, 2 ORDER BY late DESC
+                       count(*) AS attempted,
+                       count(*) FILTER (WHERE o.status = 'FAILED') AS failed
+                  FROM orders o JOIN customer c ON c.id = o.customer_id
+                 WHERE o.status IN ('DELIVERED','FAILED')
+                   AND o.delivered_at >= now() - make_interval(days => ?)
+                 GROUP BY 1, 2 ORDER BY failed DESC
                 """, days);
 
-        return Map.of("by_hour_of_day", byHour, "by_building_type", byBuilding);
+        return Map.of("by_reason", byReason, "by_area", byArea, "by_building_type", byBuilding);
     }
 
     /** Customers who have gone quiet compared with their own usual refill gap. */
@@ -315,16 +310,13 @@ public class AssistantService {
         return jdbc.queryForList("""
                 WITH gaps AS (
                     SELECT o.customer_id,
-                           CAST(o.booked_at AS DATE) AS order_date,
                            CAST(o.booked_at AS DATE) - lag(CAST(o.booked_at AS DATE))
                                 OVER (PARTITION BY o.customer_id ORDER BY o.booked_at) AS gap_days
                       FROM orders o
                      WHERE o.status IN ('DELIVERED','FAILED')
                 ),
                 profile AS (
-                    SELECT customer_id,
-                           round(avg(gap_days)) AS usual_gap_days,
-                           count(*) AS gaps_seen
+                    SELECT customer_id, round(avg(gap_days)) AS usual_gap_days
                       FROM gaps WHERE gap_days IS NOT NULL
                      GROUP BY customer_id
                 )
@@ -333,21 +325,14 @@ public class AssistantService {
                        CURRENT_DATE - CAST(max(o.booked_at) AS DATE) AS days_quiet,
                        pr.usual_gap_days,
                        count(o.id) AS total_orders,
-                       count(*) FILTER (WHERE o.status = 'FAILED') AS failed_deliveries,
-                       (SELECT count(*) FROM delivery_proof p
-                          JOIN orders o2 ON o2.id = p.order_id
-                         WHERE o2.customer_id = c.id AND p.late_minutes > 5) AS late_deliveries,
-                       (SELECT round(CAST(avg(p.late_minutes) AS numeric), 1) FROM delivery_proof p
-                          JOIN orders o3 ON o3.id = p.order_id
-                         WHERE o3.customer_id = c.id
-                           AND p.recorded_at >= max(o.booked_at) - INTERVAL '90 days') AS recent_avg_late
+                       count(*) FILTER (WHERE o.status = 'FAILED') AS failed_deliveries
                   FROM customer c
                   JOIN orders o ON o.customer_id = c.id
                   LEFT JOIN profile pr ON pr.customer_id = c.id
                  GROUP BY c.id, c.name, c.customer_type, c.phone, c.active, pr.usual_gap_days
                 HAVING CURRENT_DATE - CAST(max(o.booked_at) AS DATE) >= ?
                  ORDER BY days_quiet DESC
-                  LIMIT 25
+                 LIMIT 25
                 """, minDaysQuiet);
     }
 
@@ -367,12 +352,9 @@ public class AssistantService {
 
         List<Map<String, Object>> orders = jdbc.queryForList("""
                 SELECT o.order_no, CAST(o.booked_at AS DATE) AS booked_on, o.status,
-                       o.cylinder_count, o.failure_reason,
-                       round(CAST(o.eta_minutes AS numeric), 1) AS eta_minutes,
-                       round(CAST(p.late_minutes AS numeric), 1) AS minutes_vs_eta,
-                       p.verdict
+                       o.cylinder_count, o.failure_reason, u.full_name AS agent
                   FROM orders o
-                  LEFT JOIN delivery_proof p ON p.order_id = o.id
+                  LEFT JOIN app_user u ON u.id = o.assigned_agent_id
                  WHERE o.customer_id = ?
                  ORDER BY o.booked_at DESC LIMIT 15
                 """, id);
@@ -392,9 +374,7 @@ public class AssistantService {
                        (SELECT count(*) FROM orders
                          WHERE status = 'DELIVERED' AND CAST(delivered_at AS DATE) = CURRENT_DATE) AS delivered_today,
                        (SELECT count(*) FROM orders
-                         WHERE status = 'FAILED' AND CAST(delivered_at AS DATE) = CURRENT_DATE) AS failed_today,
-                       (SELECT count(*) FROM delivery_proof
-                         WHERE verdict = 'SUSPICIOUS' AND CAST(recorded_at AS DATE) = CURRENT_DATE) AS flagged_today
+                         WHERE status = 'FAILED' AND CAST(delivered_at AS DATE) = CURRENT_DATE) AS failed_today
                 """);
     }
 

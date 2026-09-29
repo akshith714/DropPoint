@@ -50,6 +50,10 @@ public class OrderService {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Kolkata");
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    /** The values the orders.failure_reason check constraint accepts. */
+    private static final List<String> FAILURE_REASONS =
+            List.of("NOBODY_HOME", "WRONG_ADDRESS", "CUSTOMER_REFUSED", "NO_ACCESS", "OTHER");
+
     public record OrderView(Long id, String orderNo, String customerName, String address,
                             int cylinderCount, String status, Long agentId, String agentName,
                             String deliveryCode, Instant bookedAt,
@@ -127,11 +131,12 @@ public class OrderService {
         if (!agentId.equals(order.getAssignedAgentId())) {
             throw new IllegalArgumentException("This order is assigned to another agent");
         }
-        if (reason == null || reason.isBlank()) {
-            throw new IllegalArgumentException("A failure reason is required");
+        String code = reason == null ? "" : reason.trim().toUpperCase().replace(' ', '_');
+        if (!FAILURE_REASONS.contains(code)) {
+            throw new IllegalArgumentException("Failure reason must be one of " + FAILURE_REASONS);
         }
-        order.markFailed(reason.trim().toUpperCase(), Instant.now());
-        return new DeliveryResult(true, "FAILED", "Marked as not delivered: " + reason,
+        order.markFailed(code, Instant.now());
+        return new DeliveryResult(true, "FAILED", "Marked as not delivered: " + code,
                 0, null, order.getStatus().name());
     }
 

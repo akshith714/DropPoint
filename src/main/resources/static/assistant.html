@@ -115,22 +115,22 @@ if (role === 'AGENT') {
 } else if (role === 'MANAGER') {
   chipsContainer.innerHTML = `
     <button onclick="ask(this.textContent)">What is happening today?</button>
-    <button onclick="ask(this.textContent)">Which areas have unassigned orders waiting?</button>
-    <button onclick="ask(this.textContent)">Which agent has lowest capacity load?</button>
-    <button onclick="ask(this.textContent)">How many total orders waiting in intake?</button>
+    <button onclick="ask(this.textContent)">How many orders are still waiting to be assigned?</button>
+    <button onclick="ask(this.textContent)">Which agent has the most failed deliveries this week?</button>
+    <button onclick="ask(this.textContent)">Which agents checked in late this week?</button>
   `;
 } else if (role === 'OWNER') {
   chipsContainer.innerHTML = `
     <button onclick="ask(this.textContent)">Which customers have we lost?</button>
     <button onclick="ask(this.textContent)">Who was late most this month?</button>
-    <button onclick="ask(this.textContent)">Why are deliveries running late?</button>
+    <button onclick="ask(this.textContent)">Why are deliveries failing?</button>
     <button onclick="ask(this.textContent)">Overall completion rate today</button>
   `;
 } else { // ADMIN
   chipsContainer.innerHTML = `
-    <button onclick="ask(this.textContent)">List all active user accounts</button>
-    <button onclick="ask(this.textContent)">Total orders and active agents count</button>
-    <button onclick="ask(this.textContent)">Unassigned areas summary</button>
+    <button onclick="ask(this.textContent)">How many deliveries did we do this week?</button>
+    <button onclick="ask(this.textContent)">How many agents are on duty right now?</button>
+    <button onclick="ask(this.textContent)">Which areas have the most failed deliveries?</button>
     <button onclick="ask(this.textContent)">What is happening today?</button>
   `;
 }

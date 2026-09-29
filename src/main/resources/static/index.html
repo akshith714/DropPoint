@@ -297,8 +297,9 @@
     <h2>2 · Today's Orders</h2>
     <p class="section-desc">Paste WhatsApp order logs or upload a text file. Preview the parsed orders before importing into the waiting pile.</p>
     <div>
-      <textarea id="intakeText" placeholder="Paste order messages here...
-e.g. Ramesh Kumar, 9876543210, Kothapet, 2 cylinders"></textarea>
+      <textarea id="intakeText" placeholder="One order per line: Phone, Name, Area, Address, Cylinders, Type
+e.g. 9876543210, Ramesh Kumar, Kothapet, H.No 8-12 Sri Ram Nagar, 2, DOMESTIC
+(no commas inside the address)"></textarea>
     </div>
     <div style="margin-top:10px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
       <button onclick="previewOrders()">Preview Orders</button>
@@ -974,32 +975,85 @@ function renderMyAgentOrders(list) {
   `).join('');
 }
 
+/** The browser's position, or null if it is unavailable or refused. */
+function currentPosition() {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000 });
+  });
+}
+
 async function deliverOrder(orderId) {
+  const code = prompt('Enter the 4-digit delivery code from the customer:');
+  if (!code) return;
+  // Without a position the server measures from 0,0 and flags the delivery for review.
+  const at = await currentPosition() || { latitude: 0, longitude: 0 };
   const res = await fetch(`/api/orders/${orderId}/deliver`, {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ agentId: currentUser.id, latitude: 17.3850, longitude: 78.4867, code: 'OTP123' })
+    body: JSON.stringify({ agentId: currentUser.id, latitude: at.latitude, longitude: at.longitude, code: code.trim() })
   });
-  if (res.ok) {
+  const data = await res.json().catch(() => ({}));
+  if (res.ok && data.accepted) {
+    alert(data.message || 'Delivered.');
     loadMyAgentOrders();
   } else {
-    alert('Failed to mark delivered.');
+    alert('Not delivered: ' + (data.message || data.error || 'unknown error'));
   }
 }
 
 async function failOrder(orderId) {
-  const reason = prompt('Reason for failure (e.g. Customer not available):');
+  const reason = await pickFailureReason();
   if (!reason) return;
   const res = await fetch(`/api/orders/${orderId}/fail`, {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ agentId: currentUser.id, reason })
   });
+  const data = await res.json().catch(() => ({}));
   if (res.ok) {
     loadMyAgentOrders();
   } else {
-    alert('Failed to update status.');
+    alert('Failed to update status: ' + (data.message || data.error || 'unknown error'));
   }
+}
+
+// The only values the server accepts; a free-text reason is rejected.
+const FAILURE_REASONS = [
+  ['NOBODY_HOME', 'Nobody home'],
+  ['WRONG_ADDRESS', 'Wrong address'],
+  ['CUSTOMER_REFUSED', 'Customer refused'],
+  ['NO_ACCESS', 'No access to building'],
+  ['OTHER', 'Other']
+];
+
+/** Shows a reason picker; resolves to the chosen code, or null if cancelled. */
+function pickFailureReason() {
+  return new Promise(resolve => {
+    const dlg = document.createElement('dialog');
+    dlg.style.cssText = 'border:none; border-radius:10px; padding:20px; width:min(340px, 90vw);';
+    dlg.innerHTML = `
+      <form method="dialog">
+        <div style="font-weight:bold; margin-bottom:12px;">Why could it not be delivered?</div>
+        <select name="reason" style="width:100%; padding:8px; margin-bottom:16px;">
+          ${FAILURE_REASONS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+        </select>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button value="" class="sm">Cancel</button>
+          <button value="ok" class="danger sm">Mark failed</button>
+        </div>
+      </form>`;
+    document.body.appendChild(dlg);
+    dlg.addEventListener('close', () => {
+      const chosen = dlg.returnValue === 'ok' ? dlg.querySelector('select').value : null;
+      dlg.remove();
+      resolve(chosen);
+    });
+    dlg.showModal();
+  });
 }
 
 function escapeHtml(s) {

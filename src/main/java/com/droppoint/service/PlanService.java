@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.droppoint.core.Rules;
 
@@ -40,18 +41,33 @@ public class PlanService {
                            List<String> notes, int totalOrders, int totalCapacity,
                            int carriedIn) { }
 
+    /** A saved plan and the result it was built from, before the summary is written. */
+    private record Planned(Long planId, Rules.DayPlan.Result result) { }
+
     private final JdbcTemplate jdbc;
     private final AssistantService assistant;
+    private final TransactionTemplate tx;
 
-    public PlanService(JdbcTemplate jdbc, AssistantService assistant) {
+    public PlanService(JdbcTemplate jdbc, AssistantService assistant, TransactionTemplate tx) {
         this.jdbc = jdbc;
         this.assistant = assistant;
+        this.tx = tx;
     }
 
     /* ---------------- planning ---------------- */
 
-    @Transactional
+    /**
+     * Saves the plan in one transaction, then asks the LLM for a summary outside it:
+     * a slow or failing LLM call must not hold the transaction open or roll the plan back.
+     */
     public PlanView plan() {
+        Planned planned = tx.execute(status -> buildPlan());
+        String summary = writeSummary(planned.result());
+        jdbc.update("UPDATE day_plan SET summary = ? WHERE id = ?", summary, planned.planId());
+        return view(planned.planId());
+    }
+
+    private Planned buildPlan() {
         LocalDate today = LocalDate.now(ZONE);
 
         Long existing = jdbc.query("SELECT id, status FROM day_plan WHERE plan_date = ?",
@@ -122,12 +138,9 @@ public class PlanService {
                     (int) Math.round(l.orders() * cylPerOrder.getOrDefault(l.areaId(), 1.0)));
         }
 
-        String summary = writeSummary(result);
-        jdbc.update("UPDATE day_plan SET summary = ? WHERE id = ?", summary, planId);
-
         log.info("Planned {}: {} assignments, {} leftovers",
                 today, result.assignments().size(), result.leftovers().size());
-        return view(planId);
+        return new Planned(planId, result);
     }
 
     /** Manager moves one area to a different agent before confirming. */
@@ -186,10 +199,35 @@ public class PlanService {
         return Map.of("status", "confirmed", "ordersAssigned", assigned, "carriedOver", carried);
     }
 
+    /**
+     * Undoes a confirm: orders not yet delivered or failed go back to BOOKED, and the
+     * carry-over counted at confirm is taken back, so confirming again gives the same numbers.
+     */
     @Transactional
     public void reopen() {
-        jdbc.update("UPDATE day_plan SET status = 'DRAFT', confirmed_at = NULL WHERE plan_date = ?",
+        Map<String, Object> plan = jdbc.query(
+                "SELECT id, confirmed_at FROM day_plan WHERE plan_date = ? AND status = 'CONFIRMED'",
+                rs -> rs.next() ? Map.of("id", rs.getLong(1), "confirmedAt", rs.getTimestamp(2)) : null,
                 LocalDate.now(ZONE));
+        if (plan == null) {
+            throw new NoSuchElementException("There is no confirmed plan for today");
+        }
+        Long planId = (Long) plan.get("id");
+
+        // orders that were waiting at confirm time and were counted as carried over
+        jdbc.update("""
+                UPDATE orders SET carried_days = carried_days - 1
+                 WHERE status = 'BOOKED' AND carried_days > 0 AND booked_at < ?
+                """, plan.get("confirmedAt"));
+
+        int released = jdbc.update("""
+                UPDATE orders SET status = 'BOOKED', assigned_agent_id = NULL,
+                                  assigned_at = NULL, plan_id = NULL
+                 WHERE plan_id = ? AND status = 'ASSIGNED'
+                """, planId);
+
+        jdbc.update("UPDATE day_plan SET status = 'DRAFT', confirmed_at = NULL WHERE id = ?", planId);
+        log.info("Reopened plan {}: {} orders released", planId, released);
     }
 
     /* ---------------- reading ---------------- */

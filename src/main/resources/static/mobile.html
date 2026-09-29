@@ -927,7 +927,7 @@
                     alert("Delivery successful!");
                     loadDeliveries();
                 } else {
-                    alert("Delivery failed: " + (data.message || "Invalid code"));
+                    alert("Delivery failed: " + (data.message || data.error || "Invalid code"));
                 }
             } catch (err) {
                 alert("Network error.");
@@ -937,9 +937,9 @@
         }
 
         async function markFailed(orderId) {
-            const reason = prompt("Enter reason for failure (e.g. Customer not available):");
+            const reason = await pickFailureReason();
             if (!reason) return;
-            
+
             showLoading(true);
             try {
                 const res = await fetch(`/api/orders/${orderId}/fail`, {
@@ -955,13 +955,48 @@
                     alert("Order marked as failed.");
                     loadDeliveries();
                 } else {
-                    alert("Failed to update status: " + data.message);
+                    alert("Failed to update status: " + (data.message || data.error));
                 }
             } catch (err) {
                 alert("Network error.");
             } finally {
                 showLoading(false);
             }
+        }
+
+        // The only values the server accepts; a free-text reason is rejected.
+        const FAILURE_REASONS = [
+            ['NOBODY_HOME', 'Nobody home'],
+            ['WRONG_ADDRESS', 'Wrong address'],
+            ['CUSTOMER_REFUSED', 'Customer refused'],
+            ['NO_ACCESS', 'No access to building'],
+            ['OTHER', 'Other']
+        ];
+
+        /** Shows a reason picker; resolves to the chosen code, or null if cancelled. */
+        function pickFailureReason() {
+            return new Promise(resolve => {
+                const dlg = document.createElement('dialog');
+                dlg.style.cssText = 'border:none; border-radius:12px; padding:20px; width:min(320px, 90vw);';
+                dlg.innerHTML = `
+                    <form method="dialog">
+                        <div style="font-weight:bold; margin-bottom:12px;">Why could it not be delivered?</div>
+                        <select name="reason" style="width:100%; padding:10px; font-size:16px; margin-bottom:16px;">
+                            ${FAILURE_REASONS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+                        </select>
+                        <div style="display:flex; gap:8px; justify-content:flex-end;">
+                            <button value="" style="padding:10px 16px;">Cancel</button>
+                            <button value="ok" style="padding:10px 16px; background:#c62828; color:#fff; border:none; border-radius:6px;">Mark failed</button>
+                        </div>
+                    </form>`;
+                document.body.appendChild(dlg);
+                dlg.addEventListener('close', () => {
+                    const chosen = dlg.returnValue === 'ok' ? dlg.querySelector('select').value : null;
+                    dlg.remove();
+                    resolve(chosen);
+                });
+                dlg.showModal();
+            });
         }
 
         // --- SOS Tab Logic ---
