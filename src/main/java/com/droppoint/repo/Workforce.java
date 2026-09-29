@@ -166,6 +166,11 @@ public final class Workforce {
             this.checkOutAt = at;
         }
 
+        /** Back on duty after checking out the same day: one attendance row per day, so reopen it. */
+        public void resume() {
+            this.checkOutAt = null;
+        }
+
         public Long getId() { return id; }
         public Long getAgentId() { return agentId; }
         public Long getBranchId() { return branchId; }

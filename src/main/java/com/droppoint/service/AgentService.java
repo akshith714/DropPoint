@@ -114,6 +114,11 @@ public class AgentService {
         Optional<Attendance> existing = attendances.findByAgentIdAndWorkDate(agent.getId(), today);
         if (existing.isPresent()) {
             Attendance a = existing.get();
+            if (a.getCheckOutAt() != null) {
+                a.resume();   // saved when the transaction ends (dirty checking)
+                return new CheckInResponse(true, "CHECKED_IN", "Welcome back. Your shift is resumed.",
+                        distance, a.getId(), a.getCheckInAt());
+            }
             return new CheckInResponse(true, "ALREADY_CHECKED_IN",
                     "You already checked in today.", distance, a.getId(), a.getCheckInAt());
         }
