@@ -134,6 +134,11 @@
             display: block;
         }
 
+        /* Deliveries and SOS appear only once the agent is checked in */
+        body:not(.on-duty) .duty-only {
+            display: none !important;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -458,8 +463,8 @@
     <!-- Top Navigation Tabs (Always Visible Below Header) -->
     <div class="top-tab-bar">
         <button class="top-tab-btn active" id="top-nav-checkin" onclick="switchTab('checkin')">Check-In</button>
-        <button class="top-tab-btn" id="top-nav-deliveries" onclick="switchTab('deliveries')">Deliveries</button>
-        <button class="top-tab-btn" id="top-nav-sos" onclick="switchTab('sos')">SOS Alert</button>
+        <button class="top-tab-btn duty-only" id="top-nav-deliveries" onclick="switchTab('deliveries')">Deliveries</button>
+        <button class="top-tab-btn duty-only" id="top-nav-sos" onclick="switchTab('sos')">SOS Alert</button>
     </div>
 
     <!-- Main Content -->
@@ -487,8 +492,8 @@
                 <div id="checkInError" class="error-msg"></div>
             </div>
 
-            <!-- Quick Access Card -->
-            <div class="card" style="margin-top: 16px;">
+            <!-- Quick Access Card (on duty only) -->
+            <div class="card duty-only" style="margin-top: 16px;">
                 <h2>Agent Quick Access</h2>
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <button class="btn btn-primary" onclick="switchTab('deliveries')" style="margin-top:0; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -542,13 +547,13 @@
             </svg>
             <span>Check-In</span>
         </div>
-        <div class="nav-item" onclick="switchTab('deliveries')" id="nav-deliveries">
+        <div class="nav-item duty-only" onclick="switchTab('deliveries')" id="nav-deliveries">
             <svg viewBox="0 0 24 24">
                 <path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
             </svg>
             <span>Deliveries</span>
         </div>
-        <div class="nav-item" onclick="switchTab('sos')" id="nav-sos">
+        <div class="nav-item duty-only" onclick="switchTab('sos')" id="nav-sos">
             <svg viewBox="0 0 24 24">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
             </svg>
@@ -595,6 +600,9 @@
 
         // --- Tab Switching ---
         function switchTab(tabId) {
+            if (tabId !== 'checkin' && !document.body.classList.contains('on-duty')) {
+                tabId = 'checkin';
+            }
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.top-tab-btn').forEach(el => el.classList.remove('active'));
@@ -686,6 +694,12 @@
             
             container.innerHTML = '';
             document.getElementById('checkInError').textContent = '';
+
+            const onDuty = !!statusData.checkedIn;
+            document.body.classList.toggle('on-duty', onDuty);
+            if (!onDuty) {
+                switchTab('checkin');
+            }
 
             if (statusData.checkedOutAt) {
                 // Already checked out for the day (or session)
