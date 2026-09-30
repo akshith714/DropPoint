@@ -91,6 +91,9 @@ public class AuthService {
         if (phone == null || phone.isBlank()) {
             throw new IllegalArgumentException("Phone is required");
         }
+        if (!phone.trim().matches("\\d{10}")) {
+            throw new IllegalArgumentException("Phone number must be exactly 10 digits");
+        }
         String userRole = (role != null) ? role.toUpperCase().trim() : "AGENT";
         if (!List.of("ADMIN", "OWNER", "MANAGER", "AGENT").contains(userRole)) {
             throw new IllegalArgumentException("Role must be one of ADMIN, OWNER, MANAGER, AGENT");

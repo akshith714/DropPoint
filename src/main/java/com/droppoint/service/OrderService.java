@@ -185,6 +185,22 @@ public class OrderService {
         return out;
     }
 
+    /** Orders not yet delivered, with the code the customer reads out at the door. */
+    @Transactional(readOnly = true)
+    public List<OrderView> openOrders() {
+        List<OrderView> out = new ArrayList<>();
+        for (DeliveryOrder o : orders.findByBranchIdAndStatusInOrderByBookedAtDesc(1L,
+                List.of(DeliveryOrder.Status.ASSIGNED, DeliveryOrder.Status.BOOKED))) {
+            Customer c = customers.findById(o.getCustomerId()).orElse(null);
+            if (c == null) continue;
+            String agentName = o.getAssignedAgentId() == null ? null
+                    : users.findById(o.getAssignedAgentId()).map(AppUser::getFullName).orElse(null);
+            out.add(toView(o, c, agentName));
+        }
+        out.sort(Comparator.comparing((OrderView v) -> "ASSIGNED".equals(v.status()) ? 0 : 1));
+        return out;
+    }
+
     // ---- shared ----
 
     /** Works out the ETA from the agent's current position to the customer. */

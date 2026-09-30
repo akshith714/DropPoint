@@ -201,7 +201,7 @@ public class IntakeService {
             String cylText = f.length > 4 ? f[4].trim() : "1";
             String type = f.length > 5 ? f[5].trim().toUpperCase(Locale.ROOT) : "DOMESTIC";
 
-            if (phone.length() < 10)            { rows.add(bad(lineNo, "phone must be 10 digits")); continue; }
+            if (phone.length() != 10)           { rows.add(bad(lineNo, "phone must be 10 digits")); continue; }
             if (name.isEmpty())                 { rows.add(bad(lineNo, "name is missing")); continue; }
             if (name.length() > MAX_NAME)       { rows.add(bad(lineNo, "name is too long")); continue; }
             if (typedArea.isEmpty())            { rows.add(bad(lineNo, "area is missing")); continue; }

@@ -54,6 +54,9 @@ public class AgentAdminService {
         if (phone == null || phone.isBlank()) {
             throw new IllegalArgumentException("Phone number is required");
         }
+        if (!phone.trim().matches("\\d{10}")) {
+            throw new IllegalArgumentException("Phone number must be exactly 10 digits");
+        }
         int dailyCap = (cap != null && cap > 0) ? cap : 40;
 
         Long firstArea = (preferredAreaIds != null && !preferredAreaIds.isEmpty()) ? preferredAreaIds.get(0) : preferredAreaId;
@@ -85,6 +88,9 @@ public class AgentAdminService {
             jdbc.update("UPDATE app_user SET full_name = ? WHERE id = ?", name.trim(), id);
         }
         if (phone != null && !phone.isBlank()) {
+            if (!phone.trim().matches("\\d{10}")) {
+                throw new IllegalArgumentException("Phone number must be exactly 10 digits");
+            }
             jdbc.update("UPDATE app_user SET phone = ? WHERE id = ?", phone.trim(), id);
         }
         if (cap != null && cap > 0) {

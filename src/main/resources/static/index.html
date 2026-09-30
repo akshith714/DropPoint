@@ -426,6 +426,29 @@
         </div>
         <div id="intakePreview" style="margin-top:14px"></div>
         <div id="intakeMsg" class="msg-banner"></div>
+
+        <div class="panel-row" style="margin-top:22px;">
+          <span class="panel-title">Open orders &amp; delivery codes</span>
+          <button class="grey sm" onclick="loadOpenOrders()">Refresh</button>
+        </div>
+        <p class="section-desc">The customer reads this 4-digit code to the agent at the door. The agent types it in the app to mark the order delivered.</p>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Cylinders</th>
+                <th>Agent</th>
+                <th>Status</th>
+                <th>Delivery code</th>
+              </tr>
+            </thead>
+            <tbody id="openOrderRows">
+              <tr><td colspan="6">Loading orders…</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <!-- AGENTS (ADMIN, MANAGER, OWNER) -->
@@ -459,7 +482,7 @@
             <tfoot id="tfootAddAgent">
               <tr>
                 <td><input type="text" id="newName" placeholder="Full name"></td>
-                <td><input type="text" id="newPhone" placeholder="Phone number"></td>
+                <td><input type="tel" id="newPhone" placeholder="10-digit phone" inputmode="numeric" maxlength="10" oninput="digitsOnly(this)"></td>
                 <td><input type="number" id="newCap" value="40" min="1" max="200"></td>
                 <td>
                   <select id="newPrefAreas" multiple style="height:58px;" title="Hold Ctrl to select multiple">
@@ -527,7 +550,7 @@
             <tfoot>
               <tr>
                 <td><input type="text" id="newUserName" placeholder="Full name"></td>
-                <td><input type="text" id="newUserPhone" placeholder="Phone number"></td>
+                <td><input type="tel" id="newUserPhone" placeholder="10-digit phone" inputmode="numeric" maxlength="10" oninput="digitsOnly(this)"></td>
                 <td>
                   <select id="newUserRole">
                     <option value="AGENT">AGENT</option>
@@ -755,6 +778,15 @@ function renderUserTable(users) {
   `).join('');
 }
 
+/** Keeps a phone field to digits only, at most 10. */
+function digitsOnly(input) {
+  input.value = input.value.replace(/\D/g, '').slice(0, 10);
+}
+
+function isValidPhone(phone) {
+  return /^\d{10}$/.test(phone);
+}
+
 async function createUser() {
   const name = document.getElementById('newUserName').value.trim();
   const phone = document.getElementById('newUserPhone').value.trim();
@@ -763,6 +795,10 @@ async function createUser() {
   
   if (!name || !phone) {
     alert('Please enter name and phone number.');
+    return;
+  }
+  if (!isValidPhone(phone)) {
+    alert('Phone number must be exactly 10 digits.');
     return;
   }
   const res = await fetch('/api/admin/users', {
@@ -837,7 +873,7 @@ function renderAgentTable() {
     return `
     <tr>
       <td><input type="text" value="${escapeHtml(a.name)}" id="name-${a.id}" ${isReadOnly ? 'disabled' : ''}></td>
-      <td><input type="text" value="${escapeHtml(a.phone)}" id="phone-${a.id}" ${isReadOnly ? 'disabled' : ''}></td>
+      <td><input type="tel" value="${escapeHtml(a.phone)}" id="phone-${a.id}" inputmode="numeric" maxlength="10" oninput="digitsOnly(this)" ${isReadOnly ? 'disabled' : ''}></td>
       <td><input type="number" value="${a.cap}" min="1" max="200" id="cap-${a.id}" ${isReadOnly ? 'disabled' : ''}></td>
       <td>
         ${isReadOnly ? areaBadges : `
@@ -872,16 +908,25 @@ async function updateAgentAvail(id, available) {
 
 async function saveAgent(id) {
   const name = document.getElementById(`name-${id}`).value;
-  const phone = document.getElementById(`phone-${id}`).value;
+  const phone = document.getElementById(`phone-${id}`).value.trim();
   const cap = Number(document.getElementById(`cap-${id}`).value);
   const select = document.getElementById(`prefAreas-${id}`);
   const preferredAreaIds = Array.from(select.selectedOptions).map(o => Number(o.value)).filter(v => v > 0);
+  if (!isValidPhone(phone)) {
+    alert('Phone number must be exactly 10 digits.');
+    return;
+  }
   
-  await fetch(`/api/admin/agents/${id}`, {
+  const res = await fetch(`/api/admin/agents/${id}`, {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ name, phone, cap, preferredAreaIds })
   });
+  if (!res.ok) {
+    const out = await res.json().catch(() => ({}));
+    alert(out.error || 'Failed to update agent.');
+    return;
+  }
   document.getElementById('agentMsg').textContent = 'Agent details & delivery locations updated.';
   loadAgents();
 }
@@ -895,6 +940,10 @@ async function addAgent() {
   
   if (!name || !phone) {
     alert('Please provide name and phone.');
+    return;
+  }
+  if (!isValidPhone(phone)) {
+    alert('Phone number must be exactly 10 digits.');
     return;
   }
   const res = await fetch('/api/admin/agents', {
@@ -992,6 +1041,7 @@ async function importOrders() {
     document.getElementById('importBtn').disabled = true;
     document.getElementById('intakeMsg').textContent = `Successfully imported ${data.ordersCreated || 0} orders (${data.customersCreated || 0} new customers)!`;
     loadPlan();
+    loadOpenOrders();
     loadProgress(document.getElementById('progressDate').value);
   } else {
     document.getElementById('intakeMsg').textContent = data.error || 'Import failed.';
@@ -1163,6 +1213,7 @@ async function confirmPlan() {
     document.getElementById('planMsg').textContent = `${out.ordersAssigned} orders assigned` + (out.carriedOver ? `, ${out.carriedOver} carried over.` : '.');
     loadAgents();
     loadPlan();
+    loadOpenOrders();
     loadProgress(document.getElementById('progressDate').value);
   } else {
     document.getElementById('planMsg').textContent = out.error || 'Confirmation failed.';
@@ -1173,7 +1224,32 @@ async function reopenPlan() {
   const res = await fetch('/api/plan/reopen', { method: 'POST' });
   if (res.ok) {
     loadPlan();
+    loadOpenOrders();
     loadProgress(document.getElementById('progressDate').value);
+  }
+}
+
+async function loadOpenOrders() {
+  if (!currentUser || !(currentUser.role === 'ADMIN' || currentUser.role === 'MANAGER')) return;
+  const tbody = document.getElementById('openOrderRows');
+  try {
+    const list = await fetch('/api/orders/open').then(r => r.json());
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="6">No open orders. Import some above.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(o => `
+      <tr>
+        <td>${escapeHtml(o.orderNo)}</td>
+        <td>${escapeHtml(o.customerName)}</td>
+        <td>${o.cylinderCount}</td>
+        <td>${o.agentName ? escapeHtml(o.agentName) : '<span style="color:var(--soft)">Not assigned</span>'}</td>
+        <td><span class="tag">${o.status === 'ASSIGNED' ? 'Assigned' : 'Waiting'}</span></td>
+        <td><b style="font-size:1.05rem; letter-spacing:2px;">${escapeHtml(o.deliveryCode)}</b></td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="6">Error loading orders.</td></tr>';
   }
 }
 
@@ -1498,6 +1574,7 @@ async function init() {
   await loadAgents();
   await loadPlan();
   await loadProgress(todayStr);
+  await loadOpenOrders();
 }
 init();
 </script>

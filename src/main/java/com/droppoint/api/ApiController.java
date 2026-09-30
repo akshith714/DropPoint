@@ -151,6 +151,11 @@ public class ApiController {
         return orders.fail(orderId, r.agentId(), r.reason());
     }
 
+    @GetMapping("/orders/open")
+    public List<OrderService.OrderView> openOrders() {
+        return orders.openOrders();
+    }
+
     @GetMapping("/agents/{agentId}/orders")
     public List<OrderService.AgentOrderView> myOrders(@PathVariable Long agentId) {
         return orders.myOrders(agentId);
