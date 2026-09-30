@@ -55,7 +55,7 @@ public final class Workforce {
     @Entity
     @Table(name = "app_user")
     public static class AppUser {
-        public enum Role { OWNER, MANAGER, AGENT }
+        public enum Role { ADMIN, OWNER, MANAGER, AGENT }
 
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)

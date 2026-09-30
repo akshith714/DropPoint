@@ -11,7 +11,6 @@ import java.util.NoSuchElementException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.droppoint.core.GeoPoint;
 import com.droppoint.core.Rules.ProofPolicy;
 import com.droppoint.repo.Deliveries.Area;
 import com.droppoint.repo.Deliveries.Area.AreaRepository;
@@ -24,8 +23,6 @@ import com.droppoint.repo.Workforce.AppUser.AppUserRepository;
 
 @Service
 public class OrderService {
-    private static final double MAX_PROOF_DISTANCE_M = 150;
-
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Kolkata");
 
     private static final List<String> FAILURE_REASONS =
@@ -35,8 +32,7 @@ public class OrderService {
                             int cylinderCount, String status, Long agentId, String agentName,
                             String deliveryCode, Instant bookedAt) { }
 
-    public record DeliveryResult(boolean accepted, String status, String message,
-                                 long distanceMetres, String orderStatus) { }
+    public record DeliveryResult(boolean accepted, String status, String message, String orderStatus) { }
 
     public record AgentOrderView(Long id, String orderNo, String customerName, String address,
                                  String customerPhone, int cylinderCount, String status, String areaName) { }
@@ -55,34 +51,22 @@ public class OrderService {
     }
 
     @Transactional
-    public DeliveryResult deliver(Long orderId, Long agentId, double latitude, double longitude,
-                                  String enteredCode) {
+    public DeliveryResult deliver(Long orderId, Long agentId, String enteredCode) {
         DeliveryOrder order = orders.findById(orderId)
                 .orElseThrow(() -> new NoSuchElementException("Order " + orderId + " not found"));
         if (order.getStatus() != DeliveryOrder.Status.ASSIGNED) {
             return new DeliveryResult(false, "NOT_DELIVERABLE",
-                    "This order is " + order.getStatus() + ".", 0, order.getStatus().name());
+                    "This order is " + order.getStatus() + ".", order.getStatus().name());
         }
 
-        Customer customer = customers.findById(order.getCustomerId()).orElseThrow();
-        GeoPoint customerAt = new GeoPoint(customer.getLatitude(), customer.getLongitude());
-        GeoPoint agentAt = new GeoPoint(latitude, longitude);
-
-        ProofPolicy.Result result = new ProofPolicy(MAX_PROOF_DISTANCE_M).evaluate(
-                customerAt, agentAt, order.getAssignedAgentId(), agentId,
+        ProofPolicy.Result result = ProofPolicy.evaluate(order.getAssignedAgentId(), agentId,
                 order.getDeliveryCode(), enteredCode);
-
-        long distance = Math.round(result.distanceMetres());
-
         if (!result.accepted()) {
-            return new DeliveryResult(false, result.rejection().name(), result.note(),
-                    distance, order.getStatus().name());
+            return new DeliveryResult(false, result.rejection().name(), result.note(), order.getStatus().name());
         }
 
         order.markDelivered(Instant.now());
-
-        return new DeliveryResult(true, result.verdict().name(), result.note(),
-                distance, order.getStatus().name());
+        return new DeliveryResult(true, "DELIVERED", result.note(), order.getStatus().name());
     }
 
     @Transactional
@@ -97,8 +81,7 @@ public class OrderService {
             throw new IllegalArgumentException("Failure reason must be one of " + FAILURE_REASONS);
         }
         order.markFailed(code, Instant.now());
-        return new DeliveryResult(true, "FAILED", "Marked as not delivered: " + code,
-                0, order.getStatus().name());
+        return new DeliveryResult(true, "FAILED", "Marked as not delivered: " + code, order.getStatus().name());
     }
 
     @Transactional(readOnly = true)
@@ -132,7 +115,7 @@ public class OrderService {
     public List<OrderView> openOrders() {
         List<OrderView> out = new ArrayList<>();
         for (DeliveryOrder o : orders.findByBranchIdAndStatusInOrderByBookedAtDesc(1L,
-                List.of(DeliveryOrder.Status.ASSIGNED, DeliveryOrder.Status.BOOKED))) {
+                List.of(DeliveryOrder.Status.ASSIGNED))) {
             Customer c = customers.findById(o.getCustomerId()).orElse(null);
             if (c == null) continue;
             String agentName = o.getAssignedAgentId() == null ? null
@@ -141,7 +124,7 @@ public class OrderService {
                     o.getCylinderCount(), o.getStatus().name(), o.getAssignedAgentId(), agentName,
                     o.getDeliveryCode(), o.getBookedAt()));
         }
-        out.sort(Comparator.comparing((OrderView v) -> "ASSIGNED".equals(v.status()) ? 0 : 1));
+        out.sort(Comparator.comparing(OrderView::agentName, Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(OrderView::orderNo));
         return out;
     }
 }

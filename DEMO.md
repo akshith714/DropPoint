@@ -1,102 +1,103 @@
 # DropPoint — 5 minute demo script
 
 **Never paste more than one PowerShell block at a time.** PowerShell evaluates
-variables when a block is parsed, not when each line runs. Assign an
-`Invoke-RestMethod` list to a variable before piping it, or the pipe yields one empty row.
+variables when a block is parsed, not when each line runs.
 
 ## Before they arrive
 
-1. Docker running.
-2. **Reset to the seed data.** This wipes the demo database, and the migrations reseed it
-   on start: 3 agents, 6 areas, 8 waiting orders.
+1. Docker running, database up: `docker compose up -d`
+2. **Start from a clean day.** This clears orders, customers, plans, attendance, GPS and SOS.
+   Users, the office location and the areas stay.
    ```powershell
-   docker compose down -v; docker compose up -d
+   docker exec droppoint-postgres psql -U droppoint -d droppoint -c "TRUNCATE sos_alert, location_ping, checkin_attempt, attendance, plan_assignment, day_plan, agent_availability, orders, customer RESTART IDENTITY CASCADE;"
    ```
+   Do **not** run `docker compose down -v`: it deletes the database and the migrations
+   bring back the old demo users and the old office location.
 3. Start the app: `.\mvnw spring-boot:run`. The Groq key comes from `local.properties`;
    without it the assistant and the plan summary fall back to plain text.
 4. Check it is up: `http://localhost:8081/api/ping`
-5. Open two browser windows, both on `http://localhost:8081/login.html`:
-   - **Manager window**: normal size. Click the **Manager** quick-login.
-   - **Agent window**: press F12, toggle device mode (Ctrl+Shift+M) so it looks like a phone.
-     Click the **Agent** quick-login (Ramesh Kumar, agent 4).
+5. Open two browser windows on `http://localhost:8081/login.html`:
+   - **Manager window**: normal window. Click the **Manager** quick-login (`2222222222`).
+   - **Agent window**: an **Incognito** window, so the two logins don't overwrite each other.
+     Press F12, toggle device mode (Ctrl+Shift+M) so it looks like a phone, and click the
+     **Delivery agent** quick-login (Ramesh, `3333333333`).
 6. In the agent window's DevTools, open **Sensors** (⋮ → More tools → Sensors) and set
-   Location to `17.3688, 78.5247` (Dilsukhnagar). Real laptop GPS is often too weak for
-   check-in and too far from customers for a clean delivery.
+   Location to the office: `17.4467, 78.3769`. Laptop GPS is often too weak for check-in.
 
-Use `localhost` for the agent window, not your laptop's IP from a phone: browsers only
-allow GPS on `https` or `localhost`.
+All PINs are `1234`. Use `localhost` for the agent window: browsers only allow GPS on
+`https` or `localhost`.
 
 ## The five minutes
 
 ### 1. Orders come in (45 s) — manager window, **Orders**
 "Orders arrive as WhatsApp messages or a spreadsheet. Nobody types coordinates."
 
-Click **Upload File** and pick `src/main/resources/sample_orders.csv`. The preview shows
-14 rows: 8 known customers, 6 new ones, grouped by area. Click **Import to Waiting Pile**.
-"New customers are placed by geocoding their address, or at the area centre if that fails."
+Click **Upload file** and pick `src/main/resources/sample_orders.csv`, then **Preview Orders**.
+The preview shows 14 valid rows grouped by area. Click **Import to Waiting Pile**.
+It takes about 15 seconds: each new address is geocoded, one per second.
+"Phone numbers must be exactly 10 digits; a bad line is reported, the rest still import."
 
 ### 2. Plan the day (60 s) — **Today**, Day plan card
 Click **Plan the day**.
-"Every agent has a daily cap. The plan splits areas across whoever is in today, keeps an
-agent on the area they know, and whatever doesn't fit carries over to tomorrow, first in line."
+"Every agent has a daily limit. The plan splits areas across whoever is in today, and
+whatever doesn't fit carries over to tomorrow, first in line."
 Point at the summary paragraph: "That's written by the AI from the plan's numbers."
 
 Optionally move an area to another agent with the dropdown, then click **Confirm and Assign**.
-(Reopen is safe now: it releases undelivered orders and you can plan again.)
+"Made a mistake? **Reopen** puts every undelivered order back and I can plan again."
 
-### 3. Attendance (45 s) — PowerShell
-"Agents used to sign a paper register. Check-in only works near the branch, and every
+### 3. Attendance (45 s)
+"Agents used to sign a paper register. Check-in only works at the office, and every
 attempt is logged, including the refused ones."
 
-From Gachibowli, about 15 km away:
+From Dilsukhnagar, about 18 km away:
 ```powershell
-$b = @{ latitude = 17.4401; longitude = 78.3489; accuracyMetres = 12; mockLocation = $false } | ConvertTo-Json
+$b = @{ latitude = 17.3688; longitude = 78.5247; accuracyMetres = 12; mockLocation = $false } | ConvertTo-Json
 Invoke-RestMethod -Method Post -Uri http://localhost:8081/api/agents/4/check-in -ContentType "application/json" -Body $b | Format-List
 ```
 "Refused: TOO_FAR." Then in the **agent window**, **Duty** tab, tap **Check In**. Accepted.
+In the manager window, refresh the page: **Today at a glance** now shows Ramesh "On duty since …".
 
-(The branch radius is 10 km so the live check-in works from wherever you present. To
-refuse at a tighter distance, lower `branch.checkin_radius_m`.)
+(The check-in radius is 200 m around the office. Presenting somewhere else? Keep the
+Sensors location on the office.)
 
 ### 4. Delivery proof (60 s) — agent window
 "The customer reads out a 4-digit code. Without it, the delivery doesn't count."
 
-Read the code from the manager window: **Orders** → **Open orders & delivery codes**.
-("In production the customer gets this by SMS.")
+The codes are in the manager window: **Orders** → **Assigned orders & delivery codes**.
+("In production the customer gets this by SMS. Agents never see the codes.")
 
-On a Dilsukhnagar order, tap **Delivered**:
+Agent window, **Deliveries** tab, tap **Delivered** on a stop:
 - Type `0000`: "Blocked, wrong code. The order stays open."
-- Tap again and type the real code: "Delivery verified."
+- Tap again and type the real code: "Delivery confirmed."
 
-"If the code is right but the agent is more than 150 m from the address, it still counts
-but is flagged for the manager." (Change the Sensors location to show it.)
+On another stop tap **Failed** and pick **Nobody home** from the list.
 
-On another order tap **Failed** and pick **Nobody home** from the list.
-
-Back in the manager window, **Today** at a glance: delivered and failed counts have moved.
+Back in the manager window, refresh the page. **Today at a glance**: delivered and failed counts have moved.
 "Nobody typed that in."
 
 ### 5. SOS (20 s, optional)
-Agent window, **SOS** tab (it appears after check-in): press and hold the SOS button. Within a few seconds the alert appears in
-the manager window under **SOS alerts** (the sidebar shows a red count), with the agent's position. Click **Acknowledge Alert**.
+Agent window, **SOS** tab: press and hold the button for 2 seconds. Within 10 seconds the
+alert appears in the manager window under **SOS alerts** (the sidebar shows a red count),
+with the agent's position. Click **Acknowledge Alert**.
 
-### 6. The AI (60 s) — manager window, **Ask Assistant**
+### 6. The AI (60 s) — manager window, **AI assistant**
 Click **What is happening today?**, then **Which agent has the most failed deliveries this week?**
 "It ran a real query. The model can't write SQL and can't see the database. It can only
 call six read-only functions I wrote."
 
-Don't ask about lost customers or monthly trends: a fresh reset has no history, and it
+Don't ask about lost customers or monthly trends: a clean day has no history, and it
 will truthfully say there's no data.
 
 ## Closing line
 "Everything you saw runs on one Spring Boot service and one Postgres database.
-The business rules are plain Java with tests behind them. Next steps are route planning
-across stops, WhatsApp booking, and SMS delivery codes."
+The business rules are plain Java with tests behind them. Next steps are secure logins,
+SMS delivery codes, route order for each agent, and WhatsApp booking."
 
 ## If something breaks
 - Assistant errors → the Groq key is missing from `local.properties`, or the free tier's
   rate limit hit; wait 10 seconds and ask again
-- Check-in says LOW_ACCURACY → set a location in DevTools Sensors (step 6 above)
-- Delivery flagged thousands of km away → the browser had no location; set Sensors
+- Check-in says LOW_ACCURACY or TOO_FAR → set the office location in DevTools Sensors (step 6)
+- The agent window suddenly shows the manager → both logins were in one normal window; use Incognito
 - Port 8081 busy → `Get-NetTCPConnection -LocalPort 8081 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }`
-- Anything unexplained → reset and carry on; never debug live
+- Anything unexplained → run the clean-day command from step 2 and carry on; never debug live

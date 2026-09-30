@@ -412,10 +412,10 @@
         <div id="intakeMsg" class="msg-banner"></div>
 
         <div class="panel-row" style="margin-top:22px;">
-          <span class="panel-title">Open orders &amp; delivery codes</span>
+          <span class="panel-title">Assigned orders &amp; delivery codes</span>
           <button class="grey sm" onclick="loadOpenOrders()">Refresh</button>
         </div>
-        <p class="section-desc">The customer reads this 4-digit code to the agent at the door. The agent types it in the app to mark the order delivered.</p>
+        <p class="section-desc">Orders appear here once the day plan is confirmed. The customer reads the 4-digit code to the agent at the door; the agent types it in the app to mark the order delivered.</p>
         <div class="table-responsive">
           <table>
             <thead>
@@ -424,12 +424,11 @@
                 <th>Customer</th>
                 <th>Cylinders</th>
                 <th>Agent</th>
-                <th>Status</th>
                 <th>Delivery code</th>
               </tr>
             </thead>
             <tbody id="openOrderRows">
-              <tr><td colspan="6">Loading orders…</td></tr>
+              <tr><td colspan="5">Loading orders…</td></tr>
             </tbody>
           </table>
         </div>
@@ -1194,7 +1193,7 @@ async function loadOpenOrders() {
   try {
     const list = await fetch('/api/orders/open').then(r => r.json());
     if (!list.length) {
-      tbody.innerHTML = '<tr><td colspan="6">No open orders. Import some above.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5">No assigned orders yet. Confirm the day plan to see them here.</td></tr>';
       return;
     }
     tbody.innerHTML = list.map(o => `
@@ -1202,13 +1201,12 @@ async function loadOpenOrders() {
         <td>${escapeHtml(o.orderNo)}</td>
         <td>${escapeHtml(o.customerName)}</td>
         <td>${o.cylinderCount}</td>
-        <td>${o.agentName ? escapeHtml(o.agentName) : '<span style="color:var(--soft)">Not assigned</span>'}</td>
-        <td><span class="tag">${o.status === 'ASSIGNED' ? 'Assigned' : 'Waiting'}</span></td>
+        <td>${escapeHtml(o.agentName || '')}</td>
         <td><b style="font-size:1.05rem; letter-spacing:2px;">${escapeHtml(o.deliveryCode)}</b></td>
       </tr>
     `).join('');
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="6">Error loading orders.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5">Error loading orders.</td></tr>';
   }
 }
 

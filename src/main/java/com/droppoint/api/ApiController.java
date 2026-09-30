@@ -33,7 +33,7 @@ public class ApiController {
 
     public record PingRequest(double latitude, double longitude, double accuracyMetres, boolean simulated) { }
 
-    public record DeliverRequest(Long agentId, double latitude, double longitude, String code) { }
+    public record DeliverRequest(Long agentId, String code) { }
 
     public record FailRequest(Long agentId, String reason) { }
 
@@ -139,7 +139,7 @@ public class ApiController {
 
     @PostMapping("/orders/{orderId}/deliver")
     public OrderService.DeliveryResult deliver(@PathVariable Long orderId, @RequestBody DeliverRequest r) {
-        return orders.deliver(orderId, r.agentId(), r.latitude(), r.longitude(), r.code());
+        return orders.deliver(orderId, r.agentId(), r.code());
     }
 
     @PostMapping("/orders/{orderId}/fail")
