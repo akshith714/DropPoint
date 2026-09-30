@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,11 +57,27 @@ public class AgentAdminService {
 
         Long firstArea = (preferredAreaIds != null && !preferredAreaIds.isEmpty()) ? preferredAreaIds.get(0) : preferredAreaId;
 
-        Long id = jdbc.queryForObject("""
-                INSERT INTO app_user (full_name, phone, role, branch_id, active, daily_order_cap, preferred_area_id, created_at)
-                VALUES (?, ?, 'AGENT', 1, TRUE, ?, ?, now())
-                RETURNING id
-                """, Long.class, name.trim(), phone.trim(), dailyCap, firstArea);
+        List<Map<String, Object>> existing = jdbc.queryForList(
+                "SELECT id, full_name, active FROM app_user WHERE phone = ?", phone.trim());
+        Long id;
+        if (existing.isEmpty()) {
+            id = jdbc.queryForObject("""
+                    INSERT INTO app_user (full_name, phone, role, branch_id, active, daily_order_cap, preferred_area_id, created_at)
+                    VALUES (?, ?, 'AGENT', 1, TRUE, ?, ?, now())
+                    RETURNING id
+                    """, Long.class, name.trim(), phone.trim(), dailyCap, firstArea);
+        } else if (Boolean.TRUE.equals(existing.get(0).get("active"))) {
+            throw new IllegalArgumentException("Phone " + phone.trim() + " already belongs to "
+                    + existing.get(0).get("full_name") + ".");
+        } else {
+            id = ((Number) existing.get(0).get("id")).longValue();
+            jdbc.update("""
+                    UPDATE app_user SET full_name = ?, role = 'AGENT', active = TRUE,
+                                        daily_order_cap = ?, preferred_area_id = ?
+                     WHERE id = ?
+                    """, name.trim(), dailyCap, firstArea, id);
+            jdbc.update("DELETE FROM agent_preferred_area WHERE agent_id = ?", id);
+        }
 
         if (preferredAreaIds != null && !preferredAreaIds.isEmpty()) {
             savePreferredAreas(id, preferredAreaIds);
@@ -80,6 +97,11 @@ public class AgentAdminService {
         if (phone != null && !phone.isBlank()) {
             if (!phone.trim().matches("\\d{10}")) {
                 throw new IllegalArgumentException("Phone number must be exactly 10 digits");
+            }
+            List<String> owner = jdbc.queryForList(
+                    "SELECT full_name FROM app_user WHERE phone = ? AND id <> ?", String.class, phone.trim(), id);
+            if (!owner.isEmpty()) {
+                throw new IllegalArgumentException("Phone " + phone.trim() + " already belongs to " + owner.get(0) + ".");
             }
             jdbc.update("UPDATE app_user SET phone = ? WHERE id = ?", phone.trim(), id);
         }

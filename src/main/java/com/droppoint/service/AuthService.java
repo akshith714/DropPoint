@@ -1,6 +1,7 @@
 package com.droppoint.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.slf4j.Logger;
@@ -96,11 +97,23 @@ public class AuthService {
         }
         String userPin = (pin != null && !pin.isBlank()) ? pin.trim() : "1234";
 
-        Long id = jdbc.queryForObject("""
-                INSERT INTO app_user (full_name, phone, role, branch_id, active, pin, created_at)
-                VALUES (?, ?, ?, 1, TRUE, ?, now())
-                RETURNING id
-                """, Long.class, name.trim(), phone.trim(), userRole, userPin);
+        List<Map<String, Object>> existing = jdbc.queryForList(
+                "SELECT id, full_name, active FROM app_user WHERE phone = ?", phone.trim());
+        Long id;
+        if (existing.isEmpty()) {
+            id = jdbc.queryForObject("""
+                    INSERT INTO app_user (full_name, phone, role, branch_id, active, pin, created_at)
+                    VALUES (?, ?, ?, 1, TRUE, ?, now())
+                    RETURNING id
+                    """, Long.class, name.trim(), phone.trim(), userRole, userPin);
+        } else if (Boolean.TRUE.equals(existing.get(0).get("active"))) {
+            throw new IllegalArgumentException("Phone " + phone.trim() + " already belongs to "
+                    + existing.get(0).get("full_name") + ".");
+        } else {
+            id = ((Number) existing.get(0).get("id")).longValue();
+            jdbc.update("UPDATE app_user SET full_name = ?, role = ?, pin = ?, active = TRUE WHERE id = ?",
+                    name.trim(), userRole, userPin, id);
+        }
 
         log.info("Created user {}: {} ({}) role {}", id, name, phone, userRole);
         return new UserView(id, name.trim(), phone.trim(), userRole, 1L, userPin);

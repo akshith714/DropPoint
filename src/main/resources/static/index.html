@@ -117,7 +117,7 @@
   button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
   button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-  input[type=text], input[type=number], input[type=date], input[type=password], textarea, select {
+  input[type=text], input[type=tel], input[type=number], input[type=date], input[type=password], textarea, select {
     font: inherit; font-size: 0.86rem; color: var(--ink);
     padding: 7px 10px; background: #fff; border: 1px solid var(--line-strong); border-radius: 8px;
     transition: border-color 0.15s, box-shadow 0.15s;
@@ -133,7 +133,7 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.82rem;
     background: var(--surface-2); padding: 12px 14px;
   }
-  table input[type=text] { width: 100%; min-width: 110px; max-width: 160px; }
+  table input[type=text], table input[type=tel] { width: 100%; min-width: 110px; max-width: 160px; }
   table input[type=number] { width: 70px; }
   table select { width: 100%; min-width: 120px; max-width: 170px; }
 
