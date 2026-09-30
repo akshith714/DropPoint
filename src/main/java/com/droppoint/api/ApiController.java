@@ -29,7 +29,6 @@ import com.droppoint.service.PlanService;
 @RestController
 @RequestMapping("/api")
 public class ApiController {
-
     public record CheckInRequest(double latitude, double longitude, double accuracyMetres, boolean mockLocation) { }
 
     public record PingRequest(double latitude, double longitude, double accuracyMetres, boolean simulated) { }
@@ -69,8 +68,6 @@ public class ApiController {
         this.agentAdmin = agentAdmin;
         this.auth = auth;
     }
-
-    // ---- endpoints ----
 
     @GetMapping("/ping")
     public Map<String, String> ping() {
@@ -139,7 +136,6 @@ public class ApiController {
     public AgentService.AgentStatusView agentStatus(@PathVariable Long agentId) {
         return agents.getAgentStatus(agentId);
     }
-
 
     @PostMapping("/orders/{orderId}/deliver")
     public OrderService.DeliveryResult deliver(@PathVariable Long orderId, @RequestBody DeliverRequest r) {
@@ -233,8 +229,6 @@ public class ApiController {
         plans.reopen();
         return Map.of("status", "reopened");
     }
-
-    // ---- error handling ----
 
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)

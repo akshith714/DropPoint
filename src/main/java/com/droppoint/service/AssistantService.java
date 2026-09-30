@@ -23,14 +23,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Answers plain-language questions about the business, and owns the fixed set of
- * read-only queries that answer them. The model picks which query to call by
- * name; it never sees the SQL and never writes any.
- */
 @Service
 public class AssistantService {
-
     private static final Logger log = LoggerFactory.getLogger(AssistantService.class);
     private static final String URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -62,8 +56,7 @@ public class AssistantService {
     private static final TypeReference<Map<String, Object>> MESSAGE_SHAPE = new TypeReference<>() { };
 
     private final JdbcTemplate jdbc;
-    // India time, or every date handed to the model lands a day early: a local
-    // midnight date serialised as UTC becomes the previous evening.
+
     private final ObjectMapper json = JsonMapper.builder()
             .defaultTimeZone(TimeZone.getTimeZone("Asia/Kolkata"))
             .build();
@@ -79,19 +72,15 @@ public class AssistantService {
         this.model = model;
     }
 
-    public Answer ask(String question) {
-        return ask(question, "MANAGER", null);
-    }
-
     public Answer ask(String question, String role, Long agentId) {
         if (question == null || question.isBlank()) {
             throw new IllegalArgumentException("A question is required");
         }
-        
+
         String userRole = (role != null && !role.isBlank()) ? role.toUpperCase() : "MANAGER";
         if ("AGENT".equals(userRole)) {
             String qLower = question.toLowerCase();
-            if (qLower.contains("other agent") || qLower.contains("all agents") || qLower.contains("salary") 
+            if (qLower.contains("other agent") || qLower.contains("all agents") || qLower.contains("salary")
                 || qLower.contains("profit") || qLower.contains("user list") || qLower.contains("performance of")) {
                 return new Answer("Access Restricted: Delivery Agents can only inquire about their own assigned deliveries, customer addresses, or daily targets today.", List.of(), 0);
             }
@@ -113,7 +102,6 @@ public class AssistantService {
         messages.add(Map.of("role", "user", "content", question));
 
         try {
-            // Up to three rounds: the model may chain a couple of tool calls.
             for (int round = 0; round < 3; round++) {
                 JsonNode message = callGroq(messages);
                 JsonNode toolCalls = message.get("tool_calls");
@@ -141,9 +129,7 @@ public class AssistantService {
             }
             return new Answer("I could not finish that question - too many steps.", used,
                     System.currentTimeMillis() - started);
-
         } catch (IllegalStateException e) {
-            // Already a message worth showing the owner, such as the rate-limit one.
             log.error("Assistant failed", e);
             throw e;
         } catch (Exception e) {
@@ -152,15 +138,14 @@ public class AssistantService {
         }
     }
 
-    /** Swaps typographic characters the dashboard font may show as boxes for plain ones. */
     private static String plain(String text) {
         return text
-                .replace('\u00A0', ' ')      // non-breaking space
-                .replace('\u202F', ' ')      // narrow no-break space
-                .replace('\u2011', '-')      // non-breaking hyphen
-                .replace('\u2014', '-')      // em dash
-                .replace('\u2013', '-')      // en dash
-                .replace('\u2019', '\'');    // curly apostrophe
+                .replace('\u00A0', ' ')
+                .replace('\u202F', ' ')
+                .replace('\u2011', '-')
+                .replace('\u2014', '-')
+                .replace('\u2013', '-')
+                .replace('\u2019', '\'');
     }
 
     private Object run(String name, JsonNode args) {
@@ -175,11 +160,6 @@ public class AssistantService {
         };
     }
 
-    /**
-     * Writes text from facts supplied in the instruction, with no tools. The plan summary
-     * uses this: with tools offered, the model goes looking in the database instead of
-     * using the facts it was given, and can answer that it has no data.
-     */
     public String write(String instruction) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("GROQ_API_KEY is not set");
@@ -225,7 +205,6 @@ public class AssistantService {
                 HttpResponse.BodyHandlers.ofString());
 
         if (res.statusCode() == 429) {
-            // The free tier allows 8000 tokens a minute, which a burst of questions can exhaust.
             throw new IllegalStateException("Too many questions at once. Wait a few seconds and ask again.");
         }
         if (res.statusCode() != 200) {
@@ -234,7 +213,6 @@ public class AssistantService {
         return json.readTree(res.body()).path("choices").get(0).path("message");
     }
 
-    /** The six functions the model is allowed to call. */
     private static final List<Map<String, Object>> TOOLS = List.of(
             tool("agentPunctuality",
                  "Per-agent deliveries, failures and check-in times over the last N days. Use for questions about which agent is late, slow or best.",
@@ -266,9 +244,6 @@ public class AssistantService {
                 "parameters", Map.of("type", "object", "properties", properties)));
     }
 
-    // ---- the only data the assistant can reach ----
-
-    /** Per-agent deliveries, failures and check-in times over the last N days. */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> agentPunctuality(int days) {
         return jdbc.queryForList("""
@@ -294,7 +269,6 @@ public class AssistantService {
                 """, days, days, days);
     }
 
-    /** Headline delivery numbers over the last N days. */
     @Transactional(readOnly = true)
     public Map<String, Object> deliveryStats(int days) {
         return jdbc.queryForMap("""
@@ -307,7 +281,6 @@ public class AssistantService {
                 """, days);
     }
 
-    /** Where failed deliveries cluster: by reason, by area and by building type. */
     @Transactional(readOnly = true)
     public Map<String, Object> failureBreakdown(int days) {
         List<Map<String, Object>> byReason = jdbc.queryForList("""
@@ -340,7 +313,6 @@ public class AssistantService {
         return Map.of("by_reason", byReason, "by_area", byArea, "by_building_type", byBuilding);
     }
 
-    /** Customers who have gone quiet compared with their own usual refill gap. */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> quietCustomers(int minDaysQuiet) {
         return jdbc.queryForList("""
@@ -372,7 +344,6 @@ public class AssistantService {
                 """, minDaysQuiet);
     }
 
-    /** Everything about one customer, matched loosely by name. */
     @Transactional(readOnly = true)
     public Map<String, Object> customerHistory(String nameFragment) {
         List<Map<String, Object>> found = jdbc.queryForList("""
@@ -398,7 +369,6 @@ public class AssistantService {
         return Map.of("found", true, "customer", found.get(0), "recent_orders", orders);
     }
 
-    /** What is happening right now. */
     @Transactional(readOnly = true)
     public Map<String, Object> todaySnapshot() {
         return jdbc.queryForMap("""
@@ -414,7 +384,6 @@ public class AssistantService {
                 """);
     }
 
-    /** Localities the branch delivers to, for the intake page. */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> areaList() {
         return jdbc.queryForList("""

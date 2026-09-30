@@ -17,22 +17,13 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/**
- * The branch and the people who work out of it: users, the attendance row that
- * opens and closes a working day, every check-in attempt including the refused
- * ones, and the position pings recorded while on duty. Each entity keeps its own
- * repository beside it.
- */
 public final class Workforce {
-
     private Workforce() {
-        // namespace only
     }
 
     @Entity
     @Table(name = "branch")
     public static class Branch {
-
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         private Long id;
@@ -52,7 +43,6 @@ public final class Workforce {
         public interface BranchRepository extends JpaRepository<Branch, Long> { }
 
         protected Branch() {
-            // required by JPA
         }
 
         public Long getId() { return id; }
@@ -65,7 +55,6 @@ public final class Workforce {
     @Entity
     @Table(name = "app_user")
     public static class AppUser {
-
         public enum Role { OWNER, MANAGER, AGENT }
 
         @Id
@@ -88,12 +77,9 @@ public final class Workforce {
         @Column(nullable = false)
         private boolean active;
 
-        public interface AppUserRepository extends JpaRepository<AppUser, Long> {
-            Optional<AppUser> findByPhone(String phone);
-        }
+        public interface AppUserRepository extends JpaRepository<AppUser, Long> { }
 
         protected AppUser() {
-            // required by JPA
         }
 
         public Long getId() { return id; }
@@ -107,7 +93,6 @@ public final class Workforce {
     @Entity
     @Table(name = "attendance")
     public static class Attendance {
-
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         private Long id;
@@ -144,7 +129,6 @@ public final class Workforce {
         }
 
         protected Attendance() {
-            // required by JPA
         }
 
         public Attendance(Long agentId, Long branchId, LocalDate workDate, Instant checkInAt,
@@ -166,7 +150,6 @@ public final class Workforce {
             this.checkOutAt = at;
         }
 
-        /** Back on duty after checking out the same day: one attendance row per day, so reopen it. */
         public void resume() {
             this.checkOutAt = null;
         }
@@ -174,16 +157,13 @@ public final class Workforce {
         public Long getId() { return id; }
         public Long getAgentId() { return agentId; }
         public Long getBranchId() { return branchId; }
-        public LocalDate getWorkDate() { return workDate; }
         public Instant getCheckInAt() { return checkInAt; }
-        public double getCheckInDistanceM() { return checkInDistanceM; }
         public Instant getCheckOutAt() { return checkOutAt; }
     }
 
     @Entity
     @Table(name = "checkin_attempt")
     public static class CheckinAttempt {
-
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         private Long id;
@@ -221,7 +201,6 @@ public final class Workforce {
         public interface CheckinAttemptRepository extends JpaRepository<CheckinAttempt, Long> { }
 
         protected CheckinAttempt() {
-            // required by JPA
         }
 
         public CheckinAttempt(Long agentId, Long branchId, Instant attemptedAt, double latitude,
@@ -238,19 +217,11 @@ public final class Workforce {
             this.allowed = allowed;
             this.reason = reason;
         }
-
-        public Long getId() { return id; }
-        public Long getAgentId() { return agentId; }
-        public Instant getAttemptedAt() { return attemptedAt; }
-        public double getDistanceM() { return distanceM; }
-        public boolean isAllowed() { return allowed; }
-        public String getReason() { return reason; }
     }
 
     @Entity
     @Table(name = "location_ping")
     public static class LocationPing {
-
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         private Long id;
@@ -280,7 +251,6 @@ public final class Workforce {
         private boolean simulated;
 
         protected LocationPing() {
-            // required by JPA
         }
 
         public LocationPing(Long agentId, Instant recordedAt, double latitude, double longitude,
@@ -324,7 +294,6 @@ public final class Workforce {
     @Entity
     @Table(name = "sos_alert")
     public static class SosAlert {
-
         public enum Status { ACTIVE, ACKNOWLEDGED, RESOLVED }
 
         @Id
@@ -356,14 +325,10 @@ public final class Workforce {
         @Column(name = "acknowledged_at")
         private Instant acknowledgedAt;
 
-        @Column(name = "resolved_at")
-        private Instant resolvedAt;
-
         @Column
         private String note;
 
         protected SosAlert() {
-            // required by JPA
         }
 
         public SosAlert(Long agentId, Long branchId, Instant triggeredAt,

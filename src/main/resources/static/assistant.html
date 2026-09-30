@@ -114,7 +114,6 @@
 </div>
 
 <div class="chips" id="chipsContainer">
-  <!-- Dynamic suggestions populated by JS based on role -->
 </div>
 
 <form onsubmit="event.preventDefault(); ask(document.getElementById('q').value);">
@@ -172,7 +171,7 @@ if (role === 'AGENT') {
     <button onclick="ask(this.textContent)">Why are deliveries failing?</button>
     <button onclick="ask(this.textContent)">Overall completion rate today</button>
   `;
-} else { // ADMIN
+} else {
   chipsContainer.innerHTML = `
     <button onclick="ask(this.textContent)">How many deliveries did we do this week?</button>
     <button onclick="ask(this.textContent)">How many agents are on duty right now?</button>
@@ -210,7 +209,7 @@ async function ask(question) {
     const res = await fetch('/api/assistant/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         question,
         role: currentUser ? currentUser.role : 'MANAGER',
         agentId: currentUser ? currentUser.id : null

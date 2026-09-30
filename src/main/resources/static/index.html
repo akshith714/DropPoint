@@ -11,7 +11,6 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="stylesheet" href="/app.css">
 <style>
-  /* ---------- shell ---------- */
   .shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
 
   .sidebar {
@@ -80,7 +79,6 @@
 
   .wrap { width: 100%; max-width: 1180px; margin: 0 auto; padding: 28px 32px 80px; }
 
-  /* ---------- section cards ---------- */
   .box {
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
     padding: 24px; margin-bottom: 24px; box-shadow: var(--shadow-sm);
@@ -98,7 +96,6 @@
   .subhead { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 22px 0 10px; }
   .divider-line { height: 1px; background: var(--line); margin: 24px -24px; }
 
-  /* ---------- buttons ---------- */
   button {
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     padding: 9px 15px; margin: 0 8px 8px 0;
@@ -120,7 +117,6 @@
   button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
   button svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* ---------- forms ---------- */
   input[type=text], input[type=number], input[type=date], input[type=password], textarea, select {
     font: inherit; font-size: 0.86rem; color: var(--ink);
     padding: 7px 10px; background: #fff; border: 1px solid var(--line-strong); border-radius: 8px;
@@ -141,7 +137,6 @@
   table input[type=number] { width: 70px; }
   table select { width: 100%; min-width: 120px; max-width: 170px; }
 
-  /* ---------- tables ---------- */
   .table-responsive { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
   table { width: 100%; min-width: 800px; border-collapse: collapse; font-size: 0.86rem; }
   th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
@@ -151,13 +146,11 @@
   tfoot td { background: var(--surface-2); border-top: 1px solid var(--line); border-bottom: none; }
   .hint-text { font-size: 0.7rem; color: var(--faint); margin-top: 3px; }
 
-  /* ---------- stats ---------- */
   .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
   .stats > div { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
   .stats b { display: block; font-size: 1.55rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; font-variant-numeric: tabular-nums; }
   .stats span { display: block; color: var(--muted); font-size: 0.78rem; font-weight: 500; margin-top: 2px; }
 
-  /* ---------- progress panel ---------- */
   .progress-panel { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
   .panel-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
   .panel-title { font-weight: 600; font-size: 0.92rem; display: flex; align-items: center; gap: 8px; }
@@ -175,7 +168,6 @@
   .bar i.full { background: var(--warning); }
   .bar i.success { background: var(--success); }
 
-  /* ---------- plan ---------- */
   .summary {
     display: flex; gap: 12px; align-items: flex-start;
     background: linear-gradient(135deg, #eef4ff, #f5f3ff); border: 1px solid #dbe4fb;
@@ -204,13 +196,11 @@
   .flex-header { display: flex; align-items: center; gap: 10px; }
   .flex-header label { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
 
-  /* ---------- intake ---------- */
   .intake-toolbar { display: flex; align-items: center; flex-wrap: wrap; margin-top: 12px; }
   .intake-toolbar .spacer { flex: 1; }
   .format-hint { font-size: 0.78rem; color: var(--muted); margin-bottom: 8px; }
   .format-hint code { font-size: 0.74rem; }
 
-  /* ---------- SOS ---------- */
   #sosCount { background: var(--danger-50); color: var(--danger); border-color: #f5c2c2; font-weight: 600; }
   .sos-banner {
     display: none;
@@ -236,7 +226,6 @@
   #sosEmpty svg { vertical-align: -4px; margin-right: 6px; }
   #sosEmpty svg { width: 18px; height: 18px; display: inline-block; stroke: var(--success); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* ---------- GPS modal ---------- */
   .modal-overlay { position: fixed; inset: 0; z-index: 2000; align-items: center; justify-content: center; background: rgba(15,23,42,0.5); backdrop-filter: blur(3px); padding: 16px; }
   .modal { background: var(--surface); border-radius: var(--radius-lg); width: 100%; max-width: 680px; padding: 20px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 12px; }
   .modal-head { display: flex; justify-content: space-between; align-items: center; }
@@ -245,7 +234,6 @@
   #gpsModalStatus { font-size: 0.85rem; color: var(--muted); }
   #gpsModalMap { height: 400px; border-radius: var(--radius); border: 1px solid var(--line); }
 
-  /* ---------- responsive ---------- */
   @media (max-width: 960px) {
     .shell { grid-template-columns: minmax(0, 1fr); }
     .sidebar { position: sticky; top: 0; z-index: 60; height: auto; min-width: 0; flex-direction: row; align-items: center; flex-wrap: wrap; }
@@ -275,7 +263,6 @@
 
 <div class="shell">
 
-  <!-- ---------- sidebar ---------- -->
   <aside class="sidebar">
     <div class="side-brand">
       <div class="mark"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
@@ -333,7 +320,6 @@
     </div>
   </aside>
 
-  <!-- ---------- main ---------- -->
   <div class="main">
     <header class="topbar">
       <div>
@@ -351,7 +337,6 @@
 
     <div class="wrap">
 
-      <!-- TODAY: PROGRESS AND PLAN (ADMIN, MANAGER, OWNER) -->
       <section class="box" id="planSection" style="display:none;">
         <div class="box-head">
           <div class="title">
@@ -399,7 +384,6 @@
         </div>
       </section>
 
-      <!-- ORDERS INTAKE (ADMIN, MANAGER) -->
       <section class="box" id="intakeSection" style="display:none;">
         <div class="box-head">
           <div class="title">
@@ -451,7 +435,6 @@
         </div>
       </section>
 
-      <!-- AGENTS (ADMIN, MANAGER, OWNER) -->
       <section class="box" id="agentsSection" style="display:none;">
         <div class="box-head">
           <div class="title">
@@ -499,7 +482,6 @@
         <div id="agentMsg" class="msg-banner"></div>
       </section>
 
-      <!-- SOS ALERTS (ADMIN, MANAGER, OWNER) -->
       <section class="box" id="sosSection" style="display:none;">
         <div class="box-head">
           <div class="title">
@@ -522,7 +504,6 @@
         </div>
       </section>
 
-      <!-- USERS (ADMIN ONLY) -->
       <section class="box" id="adminUserSection" style="display:none;">
         <div class="box-head">
           <div class="title">
@@ -568,7 +549,6 @@
         <div id="userMsg" class="msg-banner"></div>
       </section>
 
-      <!-- AGENT GPS MODAL -->
       <div id="gpsModalOverlay" class="modal-overlay" style="display:none;">
         <div class="modal">
           <div class="modal-head">
@@ -580,7 +560,6 @@
         </div>
       </div>
 
-      <!-- AGENT PORTAL (AGENT ROLE; agents are normally sent to the mobile app) -->
       <section class="box" id="agentPortalSection" style="display:none;">
         <div class="box-head">
           <div class="title">
@@ -629,11 +608,9 @@ let agents = [];
 let areas = [];
 let previewData = null;
 
-// Initialize Date Picker to Today's date (Asia/Kolkata)
 const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 document.getElementById('progressDate').value = todayStr;
 
-/* ================= AUTHENTICATION & ROLE ENFORCEMENT ================= */
 function checkAuth() {
   const saved = localStorage.getItem('dp_user');
   if (!saved) {
@@ -660,22 +637,14 @@ function logout() {
 
 function applyUserRole() {
   if (!currentUser) return;
-  
-  // Header badge
+
   document.getElementById('userName').textContent = currentUser.name;
   const roleEl = document.getElementById('userRole');
   roleEl.textContent = currentUser.role;
   roleEl.className = 'role-pill role-' + currentUser.role;
-  
+
   const role = currentUser.role;
-  
-  /* STRICT ROLE ISOLATION:
-     - AGENT: HIDE Sections 1, 2, and 3 completely! SHOW ONLY Agent Portal.
-     - OWNER: SHOW Section 1 (read-only) and Section 3 (read-only progress summary). HIDE Section 2 and Admin.
-     - MANAGER: SHOW Section 1, Section 2, Section 3. HIDE Admin user section and Agent portal.
-     - ADMIN: SHOW Admin section, Section 1, Section 2, Section 3. HIDE Agent portal.
-  */
-  
+
   document.getElementById('adminUserSection').style.display = (role === 'ADMIN') ? 'block' : 'none';
   document.getElementById('agentsSection').style.display = (role === 'ADMIN' || role === 'MANAGER' || role === 'OWNER') ? 'block' : 'none';
   document.getElementById('intakeSection').style.display = (role === 'ADMIN' || role === 'MANAGER') ? 'block' : 'none';
@@ -683,11 +652,9 @@ function applyUserRole() {
   document.getElementById('planButtons').style.display = (role === 'ADMIN' || role === 'MANAGER') ? 'block' : 'none';
   document.getElementById('thActions').style.display = (role === 'OWNER') ? 'none' : 'table-cell';
   document.getElementById('tfootAddAgent').style.display = (role === 'ADMIN' || role === 'MANAGER') ? 'table-footer-group' : 'none';
-  
-  // SOS Section — visible to ADMIN, MANAGER, OWNER
+
   document.getElementById('sosSection').style.display = (role === 'ADMIN' || role === 'MANAGER' || role === 'OWNER') ? 'block' : 'none';
-  
-  // Agent Portal is ONLY for AGENT role
+
   document.getElementById('agentPortalSection').style.display = (role === 'AGENT') ? 'block' : 'none';
 
   decorateShell();
@@ -701,7 +668,7 @@ function applyUserRole() {
   }
   if (role === 'ADMIN' || role === 'MANAGER' || role === 'OWNER') {
     loadSosAlerts();
-    // Poll every 10 seconds for SOS alerts (only when tab is visible)
+
     setInterval(() => {
       if (document.visibilityState === 'visible') {
         loadSosAlerts();
@@ -710,7 +677,6 @@ function applyUserRole() {
   }
 }
 
-/* ================= SHELL: greeting, avatar and sidebar ================= */
 function decorateShell() {
   const name = currentUser.name || 'there';
   document.getElementById('userAvatar').textContent = initials(name);
@@ -721,7 +687,6 @@ function decorateShell() {
   document.getElementById('todayLabel').textContent = new Date().toLocaleDateString('en-IN',
     { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
 
-  // Only link to sections this role can see; drop groups left empty.
   document.querySelectorAll('#sideNav a[data-section]').forEach(a => {
     const section = document.getElementById(a.dataset.section);
     a.style.display = section && section.style.display !== 'none' ? '' : 'none';
@@ -731,7 +696,6 @@ function decorateShell() {
     g.style.display = visible ? '' : 'none';
   });
 
-  // Highlight the last section whose top has scrolled past the top bar.
   const links = [...document.querySelectorAll('#sideNav a[data-section]')]
     .filter(a => a.style.display !== 'none');
   const syncActive = () => {
@@ -749,7 +713,6 @@ function initials(name) {
   return String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
 }
 
-/* ================= ADMIN USER MANAGEMENT ================= */
 async function loadUsers() {
   try {
     const users = await fetch('/api/admin/users').then(r => r.json());
@@ -778,7 +741,6 @@ function renderUserTable(users) {
   `).join('');
 }
 
-/** Keeps a phone field to digits only, at most 10. */
 function digitsOnly(input) {
   input.value = input.value.replace(/\D/g, '').slice(0, 10);
 }
@@ -792,7 +754,7 @@ async function createUser() {
   const phone = document.getElementById('newUserPhone').value.trim();
   const role = document.getElementById('newUserRole').value;
   const pin = document.getElementById('newUserPin').value.trim() || '1234';
-  
+
   if (!name || !phone) {
     alert('Please enter name and phone number.');
     return;
@@ -824,7 +786,6 @@ async function deleteUser(id) {
   loadUsers();
 }
 
-/* ================= 1. AGENTS ================= */
 async function loadAreas() {
   try {
     areas = await fetch('/api/areas').then(r => r.json());
@@ -842,7 +803,7 @@ function renderAreaDropdowns() {
 }
 
 async function loadAgents() {
-  if (currentUser && currentUser.role === 'AGENT') return; // Do not fetch agent list for agents
+  if (currentUser && currentUser.role === 'AGENT') return;
   try {
     agents = await fetch('/api/admin/agents').then(r => r.json());
     renderAgentTable();
@@ -857,7 +818,7 @@ function renderAgentTable() {
     tbody.innerHTML = '<tr><td colspan="8">No active agents. Add one below.</td></tr>';
     return;
   }
-  
+
   const isReadOnly = currentUser && currentUser.role === 'OWNER';
 
   tbody.innerHTML = agents.map(a => {
@@ -916,7 +877,7 @@ async function saveAgent(id) {
     alert('Phone number must be exactly 10 digits.');
     return;
   }
-  
+
   const res = await fetch(`/api/admin/agents/${id}`, {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
@@ -937,7 +898,7 @@ async function addAgent() {
   const cap = Number(document.getElementById('newCap').value);
   const select = document.getElementById('newPrefAreas');
   const preferredAreaIds = Array.from(select.selectedOptions).map(o => Number(o.value)).filter(v => v > 0);
-  
+
   if (!name || !phone) {
     alert('Please provide name and phone.');
     return;
@@ -968,7 +929,6 @@ async function deleteAgent(id) {
   loadAgents();
 }
 
-/* ================= 2. TODAY'S ORDERS ================= */
 function handleFileSelect(evt) {
   const file = evt.target.files[0];
   if (!file) return;
@@ -996,13 +956,13 @@ async function previewOrders() {
   const data = await res.json();
   previewData = data;
   document.getElementById('intakeMsg').textContent = '';
-  
+
   if (!res.ok) {
     document.getElementById('intakePreview').innerHTML = `<p style="color:var(--red)">${data.error || 'Failed to preview.'}</p>`;
     document.getElementById('importBtn').disabled = true;
     return;
   }
-  
+
   const rows = data.rows || [];
   const validCount = data.valid != null ? data.valid : rows.filter(r => !r.problem).length;
   let html = `<p><b>Found ${validCount} valid order(s)</b> out of ${rows.length} line(s):</p>`;
@@ -1048,9 +1008,8 @@ async function importOrders() {
   }
 }
 
-/* ================= 3. HISTORICAL PROGRESS & PLAN ================= */
 async function loadProgress(dateStr) {
-  if (currentUser && currentUser.role === 'AGENT') return; // Agents cannot view full progress
+  if (currentUser && currentUser.role === 'AGENT') return;
   if (!dateStr) dateStr = todayStr;
   try {
     const res = await fetch(`/api/plan/progress?date=${dateStr}`);
@@ -1253,7 +1212,6 @@ async function loadOpenOrders() {
   }
 }
 
-/* ================= 4. AGENT PORTAL (AGENT ROLE ONLY) ================= */
 async function loadMyAgentOrders() {
   if (!currentUser || currentUser.role !== 'AGENT') return;
   try {
@@ -1273,10 +1231,10 @@ function renderMyAgentOrders(list) {
     document.getElementById('myPendingStops').textContent = '0';
     return;
   }
-  
+
   let delivered = list.filter(o => o.status === 'DELIVERED').length;
   let pending = list.filter(o => o.status === 'ASSIGNED').length;
-  
+
   document.getElementById('myTotalStops').textContent = list.length;
   document.getElementById('myDeliveredStops').textContent = delivered;
   document.getElementById('myPendingStops').textContent = pending;
@@ -1303,7 +1261,6 @@ function renderMyAgentOrders(list) {
   `).join('');
 }
 
-/** The browser's position, or null if it is unavailable or refused. */
 function currentPosition() {
   return new Promise(resolve => {
     if (!navigator.geolocation) return resolve(null);
@@ -1317,7 +1274,7 @@ function currentPosition() {
 async function deliverOrder(orderId) {
   const code = prompt('Enter the 4-digit delivery code from the customer:');
   if (!code) return;
-  // Without a position the server measures from 0,0 and flags the delivery for review.
+
   const at = await currentPosition() || { latitude: 0, longitude: 0 };
   const res = await fetch(`/api/orders/${orderId}/deliver`, {
     method: 'POST',
@@ -1349,7 +1306,6 @@ async function failOrder(orderId) {
   }
 }
 
-// The only values the server accepts; a free-text reason is rejected.
 const FAILURE_REASONS = [
   ['NOBODY_HOME', 'Nobody home'],
   ['WRONG_ADDRESS', 'Wrong address'],
@@ -1358,7 +1314,6 @@ const FAILURE_REASONS = [
   ['OTHER', 'Other']
 ];
 
-/** Shows a reason picker; resolves to the chosen code, or null if cancelled. */
 function pickFailureReason() {
   return new Promise(resolve => {
     const dlg = document.createElement('dialog');
@@ -1388,7 +1343,6 @@ function escapeHtml(s) {
   return String(s || '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
 }
 
-/* ================= AGENT INDIVIDUAL GPS MODAL ================= */
 let modalMap = null;
 let modalMarker = null;
 let currentModalAgentId = null;
@@ -1433,7 +1387,7 @@ async function fetchAndRenderSingleAgentGps(agentId, agentName) {
   try {
     const locations = await fetch('/api/agents/locations').then(r => r.json());
     const loc = locations.find(l => String(l.agentId) === String(agentId));
-    
+
     if (!loc) {
       document.getElementById('gpsModalStatus').innerHTML = '<span style="color:var(--amber)">Agent is offline or has not checked in today.</span>';
       if (modalMarker) {
@@ -1446,8 +1400,8 @@ async function fetchAndRenderSingleAgentGps(agentId, agentName) {
     const timeStr = new Date(loc.lastPingAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const speedStr = loc.speedKmph != null ? ` &middot; Speed: ${loc.speedKmph} km/h` : '';
     const suspStr = loc.suspicious ? ' <b style="color:var(--red)">(SUSPICIOUS MOVEMENT)</b>' : '';
-    
-    document.getElementById('gpsModalStatus').innerHTML = 
+
+    document.getElementById('gpsModalStatus').innerHTML =
       `<span style="color:var(--green); font-weight:600;">Active On-Duty</span> &middot; Last updated ${timeStr}${speedStr}${suspStr}`;
 
     const latLng = [loc.latitude, loc.longitude];
@@ -1473,7 +1427,6 @@ async function fetchAndRenderSingleAgentGps(agentId, agentName) {
   }
 }
 
-/* ================= 6. SOS ALERTS ================= */
 let previousSosCount = 0;
 
 async function loadSosAlerts() {
@@ -1506,10 +1459,9 @@ function renderSosAlerts(alerts) {
 
   emptyDiv.style.display = 'none';
 
-  // Flash banner if new alerts appeared
   if (alerts.length > previousSosCount) {
     banner.style.display = 'block';
-    // Try browser notification
+
     if (Notification && Notification.permission === 'granted') {
       new Notification('DropPoint SOS Alert', { body: alerts[0].agentName + ' triggered an emergency alert!' });
     } else if (Notification && Notification.permission !== 'denied') {
@@ -1565,8 +1517,6 @@ async function acknowledgeSos(alertId) {
   }
 }
 
-
-// Initial initialization
 async function init() {
   if (!checkAuth()) return;
   applyUserRole();

@@ -7,23 +7,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * The business rules, one nested class each. They hold no state beyond their
- * own settings, touch no database and know nothing about Spring, which is what
- * makes them the part of the system worth unit testing.
- */
 public final class Rules {
-
     private Rules() {
-        // namespace only
     }
 
-    /**
-     * Decides whether a delivery agent may check in at a branch.
-     * Checks, in order: fake location, GPS accuracy, distance from the branch.
-     */
     public static final class CheckInPolicy {
-
         public enum Reason { ALLOWED, MOCK_LOCATION, LOW_ACCURACY, TOO_FAR }
 
         public record Result(boolean allowed, Reason reason, double distanceMetres) { }
@@ -65,101 +53,11 @@ public final class Rules {
         }
     }
 
-    /**
-     * Turns travel time into a realistic delivery time by adding the handover
-     * minutes Google cannot know about: building type, floor, lift, cylinder count.
-     */
-    public static final class EtaCalculator {
-
-        /** Everything about the drop that affects how long the handover takes. */
-        public record DropContext(BuildingType buildingType, int floorNo, boolean hasLift, int cylinderCount) { }
-
-        public enum BuildingType { INDEPENDENT, APARTMENT, GATED, COMMERCIAL }
-
-        /** The breakdown, so the app can explain itself. */
-        public record Estimate(double travelMinutes, double handoverMinutes, double totalMinutes,
-                               String explanation) { }
-
-        /** Minutes at the door before any floor or load penalty. */
-        private static final double BASE_INDEPENDENT = 3.0;
-        private static final double BASE_APARTMENT = 5.0;
-        private static final double BASE_GATED = 7.0;      // security desk, visitor entry
-        private static final double BASE_COMMERCIAL = 8.0; // paperwork, kitchen access
-
-        /** Extra minutes per floor. */
-        private static final double PER_FLOOR_STAIRS = 1.5;
-        private static final double PER_FLOOR_LIFT = 0.4;
-
-        /** Extra minutes for each cylinder after the first. */
-        private static final double PER_EXTRA_CYLINDER = 1.5;
-
-        private EtaCalculator() {
-            // utility class
-        }
-
-        public static Estimate estimate(double travelMinutes, DropContext drop) {
-            if (!(travelMinutes >= 0)) {
-                throw new IllegalArgumentException("Travel minutes must be zero or more, was " + travelMinutes);
-            }
-            if (drop == null) {
-                throw new IllegalArgumentException("Drop context is required");
-            }
-            if (drop.buildingType() == null) {
-                throw new IllegalArgumentException("Building type is required");
-            }
-            if (drop.floorNo() < 0 || drop.floorNo() > 100) {
-                throw new IllegalArgumentException("Floor must be between 0 and 100, was " + drop.floorNo());
-            }
-            if (drop.cylinderCount() < 1) {
-                throw new IllegalArgumentException("Cylinder count must be at least 1, was " + drop.cylinderCount());
-            }
-
-            double base = switch (drop.buildingType()) {
-                case INDEPENDENT -> BASE_INDEPENDENT;
-                case APARTMENT -> BASE_APARTMENT;
-                case GATED -> BASE_GATED;
-                case COMMERCIAL -> BASE_COMMERCIAL;
-            };
-
-            double perFloor = drop.hasLift() ? PER_FLOOR_LIFT : PER_FLOOR_STAIRS;
-            double floorPenalty = drop.floorNo() * perFloor;
-            double cylinderExtra = (drop.cylinderCount() - 1) * PER_EXTRA_CYLINDER;
-
-            double handover = round1(base + floorPenalty + cylinderExtra);
-            double total = round1(travelMinutes + handover);
-
-            return new Estimate(round1(travelMinutes), handover, total,
-                    explain(drop, base, floorPenalty, cylinderExtra));
-        }
-
-        private static String explain(DropContext drop, double base, double floorPenalty, double cylinderExtra) {
-            StringBuilder s = new StringBuilder();
-            s.append(round1(base)).append(" min at ")
-             .append(drop.buildingType() == BuildingType.INDEPENDENT ? "an " : "a ")
-             .append(drop.buildingType().name().toLowerCase()).append(" address");
-            if (floorPenalty > 0) {
-                s.append(", +").append(round1(floorPenalty)).append(" min for floor ").append(drop.floorNo())
-                 .append(drop.hasLift() ? " with lift" : " with no lift");
-            }
-            if (cylinderExtra > 0) {
-                s.append(", +").append(round1(cylinderExtra)).append(" min for ")
-                 .append(drop.cylinderCount()).append(" cylinders");
-            }
-            return s.toString();
-        }
-    }
-
-    /**
-     * Decides whether a delivery claim can be trusted.
-     * A wrong code blocks the delivery; a bad location only flags it.
-     */
     public static final class ProofPolicy {
-
         public enum Verdict { VERIFIED, SUSPICIOUS }
 
         public enum Rejection { NOT_ASSIGNED_AGENT, WRONG_CODE }
 
-        /** Either a rejection (delivery blocked) or a verdict with the distance. */
         public record Result(boolean accepted, Rejection rejection, Verdict verdict,
                              double distanceMetres, String note) { }
 
@@ -175,7 +73,6 @@ public final class Rules {
         public Result evaluate(GeoPoint customerAt, GeoPoint agentAt,
                                Long assignedAgentId, Long claimingAgentId,
                                String expectedCode, String enteredCode) {
-
             if (customerAt == null || agentAt == null) {
                 throw new IllegalArgumentException("Both positions are required");
             }
@@ -208,24 +105,14 @@ public final class Rules {
         }
     }
 
-    /**
-     * Splits a day's areas across the agents who are available, respecting each
-     * agent's daily cap. No distance and no coordinates: an agent covers whole
-     * areas. Whoever covered an area most recently keeps it when they have room.
-     */
     public static final class DayPlan {
-
-        /** All the orders waiting in one area today. */
         public record AreaLoad(Long areaId, String areaName, int orders, int cylinders) { }
 
-        /** An agent who is in today, and how many more stops they can take. */
         public record AgentSlot(Long agentId, String agentName, int capacity, Long lastCoveredAreaId) { }
 
-        /** One agent taking some or all of one area. */
         public record Assignment(Long agentId, String agentName, Long areaId, String areaName,
                                  int orders, boolean partial) { }
 
-        /** Orders that nobody could take today. */
         public record Leftover(Long areaId, String areaName, int orders, String reason) { }
 
         public record Result(List<Assignment> assignments, List<Leftover> leftovers,
@@ -248,7 +135,6 @@ public final class Rules {
                 }
             }
 
-            // remaining capacity per agent, in a stable order
             Map<Long, Integer> left = new LinkedHashMap<>();
             Map<Long, AgentSlot> byId = new LinkedHashMap<>();
             for (AgentSlot s : agents) {
@@ -259,7 +145,6 @@ public final class Rules {
             int totalCapacity = left.values().stream().mapToInt(Integer::intValue).sum();
             int totalOrders = areas.stream().mapToInt(AreaLoad::orders).sum();
 
-            // biggest areas first, name as tie-break so the plan is repeatable
             List<AreaLoad> queue = new ArrayList<>(areas);
             queue.sort(Comparator.comparingInt(AreaLoad::orders).reversed()
                     .thenComparing(AreaLoad::areaName));
@@ -298,7 +183,6 @@ public final class Rules {
                 }
             }
 
-            // how many areas each agent ended up with
             Map<Long, Long> areasPerAgent = assignments.stream().collect(
                     Collectors.groupingBy(Assignment::agentId,
                             Collectors.mapping(Assignment::areaId, Collectors.collectingAndThen(
@@ -318,10 +202,6 @@ public final class Rules {
             return new Result(assignments, leftovers, notes, totalCapacity, totalOrders);
         }
 
-        /**
-         * Prefers the agent who covered this area last and can take all of it,
-         * otherwise the agent with the most spare capacity.
-         */
         private static Long pick(Long areaId, int needed, Map<Long, Integer> left,
                                  Map<Long, AgentSlot> byId) {
             Long sticky = null;
@@ -344,9 +224,5 @@ public final class Rules {
             }
             return best;
         }
-    }
-
-    private static double round1(double value) {
-        return Math.round(value * 10) / 10.0;
     }
 }

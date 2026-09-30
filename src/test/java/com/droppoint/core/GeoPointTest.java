@@ -8,10 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 class GeoPointTest {
-
     private static final double ONE_DEGREE_METRES = 111_194.93;
-
-    // ---- validation ----
 
     @Test
     void acceptsExactBoundaryValues() {
@@ -36,8 +33,6 @@ class GeoPointTest {
         assertThrows(IllegalArgumentException.class, () -> new GeoPoint(Double.NaN, 0));
         assertThrows(IllegalArgumentException.class, () -> new GeoPoint(0, Double.NaN));
     }
-
-    // ---- distance ----
 
     @Test
     void samePointIsZeroMetres() {

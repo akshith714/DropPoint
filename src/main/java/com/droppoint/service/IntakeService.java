@@ -33,26 +33,17 @@ import com.droppoint.repo.Deliveries.Customer.CustomerRepository;
 import com.droppoint.repo.Deliveries.DeliveryOrder;
 import com.droppoint.repo.Deliveries.DeliveryOrder.DeliveryOrderRepository;
 
-/**
- * Turns a pasted or uploaded list of the day's orders into customers and orders.
- * Nobody types coordinates: a location is taken from a past delivery, from
- * geocoding the address, or from the locality centre - in that order.
- */
 @Service
 public class IntakeService {
-
     private static final Logger log = LoggerFactory.getLogger(IntakeService.class);
     private static final ZoneId ZONE = ZoneId.of("Asia/Kolkata");
     private static final long BRANCH_ID = 1L;
 
-    /** Widths the customer table will accept, checked here so a long line is reported, not thrown. */
     private static final int MAX_NAME = 150;
     private static final int MAX_ADDRESS = 250;
 
-    /** Nominatim asks for no more than one request a second. */
     private static final long GEOCODE_GAP_MS = 1_100;
 
-    /** One parsed line, before it is saved. The area is the locality's canonical name. */
     public record Row(int lineNo, String phone, String name, String area, String address,
                       int cylinders, String type, String locationSource, String problem) {
         public boolean isValid() { return problem == null; }
@@ -64,7 +55,6 @@ public class IntakeService {
     public record ImportResult(String batch, int ordersCreated, int customersCreated,
                                int skipped, List<String> problems, Map<String, Integer> byArea) { }
 
-    /** A resolved position and how much we trust it. */
     private record Located(double latitude, double longitude, String source) { }
 
     private final CustomerRepository customers;
@@ -82,7 +72,6 @@ public class IntakeService {
         this.areas = areas;
     }
 
-    /** Parses without saving, so the manager can check before committing. */
     @Transactional(readOnly = true)
     public Preview preview(String text) {
         List<Row> rows = parse(text, activeAreas());
@@ -152,7 +141,6 @@ public class IntakeService {
         return new ImportResult(batch, created, newCustomers, skipped, problems, byArea);
     }
 
-    /** The branch's localities, keyed by lower-case name so a typed area can be matched. */
     private Map<String, Area> activeAreas() {
         Map<String, Area> byName = new HashMap<>();
         for (Area a : areas.findByBranchIdAndActiveTrue(BRANCH_ID)) {
@@ -161,12 +149,6 @@ public class IntakeService {
         return byName;
     }
 
-    /* ---------------- parsing ---------------- */
-
-    /**
-     * Reads every line into a row, valid or not. Preview and import both come
-     * through here, so what the manager checks is what gets saved.
-     */
     private List<Row> parse(String text, Map<String, Area> areaByName) {
         List<Row> rows = new ArrayList<>();
         if (text == null || text.isBlank()) {
@@ -180,7 +162,7 @@ public class IntakeService {
             if (line.isEmpty()) {
                 continue;
             }
-            // only the first line with content can be the header
+
             if (headerAllowed && line.toLowerCase(Locale.ROOT).startsWith("phone")) {
                 headerAllowed = false;
                 continue;
@@ -241,9 +223,6 @@ public class IntakeService {
         return new Row(lineNo, "", "", "", "", 0, "", "", problem);
     }
 
-    /* ---------------- location ---------------- */
-
-    /** Geocodes the address, falling back to the locality centre when that fails. */
     private Located locate(String address, Area area) {
         try {
             pauseForNominatim();
@@ -260,7 +239,7 @@ public class IntakeService {
             if (res.statusCode() == 200 && body.contains("\"lat\"")) {
                 double lat = Double.parseDouble(between(body, "\"lat\":\"", "\""));
                 double lon = Double.parseDouble(between(body, "\"lon\":\"", "\""));
-                // sanity: a hit somewhere else in the world is worse than the locality centre
+
                 if (lat > 17.0 && lat < 17.8 && lon > 78.0 && lon < 78.9) {
                     return new Located(lat, lon, "GEOCODED");
                 }
@@ -268,8 +247,7 @@ public class IntakeService {
         } catch (Exception e) {
             log.debug("Geocoding failed for {}: {}", address, e.getMessage());
         }
-        // Spread the fallbacks by up to ~400 m: thirty orders stacked on one
-        // point would leave clustering with nothing to work with.
+
         double jitter = 0.004;
         return new Located(
                 area.getLatitude() + ThreadLocalRandom.current().nextDouble(-jitter, jitter),
@@ -277,7 +255,6 @@ public class IntakeService {
                 "AREA");
     }
 
-    /** Keeps successive geocoding calls a second apart, as Nominatim's terms ask. */
     private void pauseForNominatim() throws InterruptedException {
         if (lastGeocodeAt > 0) {
             long waitMs = GEOCODE_GAP_MS - (System.currentTimeMillis() - lastGeocodeAt);
@@ -293,7 +270,6 @@ public class IntakeService {
         return s.substring(a, s.indexOf(end, a));
     }
 
-    /** An order number not already taken in the table or earlier in this batch. */
     private String nextOrderNo(Set<String> usedInBatch) {
         String prefix = "DP" + LocalDate.now(ZONE).toString().replace("-", "") + "-";
         for (int attempt = 0; attempt < 200; attempt++) {

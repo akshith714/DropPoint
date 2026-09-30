@@ -61,7 +61,7 @@ refuse at a tighter distance, lower `branch.checkin_radius_m`.)
 ### 4. Delivery proof (60 s) — agent window
 "The customer reads out a 4-digit code. Without it, the delivery doesn't count."
 
-Get Ramesh's codes in a third tab: `http://localhost:8081/api/agents/4/orders`
+Read the code from the manager window: **Orders** → **Open orders & delivery codes**.
 ("In production the customer gets this by SMS.")
 
 On a Dilsukhnagar order, tap **Delivered**:

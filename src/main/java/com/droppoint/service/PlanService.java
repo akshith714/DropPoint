@@ -19,14 +19,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.droppoint.core.Rules;
 
-/**
- * Builds the day's plan: which agent covers which area, within each agent's
- * daily cap. Nothing is hardcoded - agents, areas and availability all come
- * from the database.
- */
 @Service
 public class PlanService {
-
     private static final Logger log = LoggerFactory.getLogger(PlanService.class);
     private static final ZoneId ZONE = ZoneId.of("Asia/Kolkata");
 
@@ -41,7 +35,6 @@ public class PlanService {
                            List<String> notes, int totalOrders, int totalCapacity,
                            int carriedIn) { }
 
-    /** A saved plan and the result it was built from, before the summary is written. */
     private record Planned(Long planId, Rules.DayPlan.Result result) { }
 
     private final JdbcTemplate jdbc;
@@ -54,12 +47,6 @@ public class PlanService {
         this.tx = tx;
     }
 
-    /* ---------------- planning ---------------- */
-
-    /**
-     * Saves the plan in one transaction, then asks the LLM for a summary outside it:
-     * a slow or failing LLM call must not hold the transaction open or roll the plan back.
-     */
     public PlanView plan() {
         Planned planned = tx.execute(status -> buildPlan());
         String summary = writeSummary(planned.result());
@@ -87,7 +74,6 @@ public class PlanService {
                     Long.class, today);
         }
 
-        // what is waiting, by area
         List<Rules.DayPlan.AreaLoad> areaLoads = jdbc.query("""
                 SELECT a.id, a.name, count(o.id), COALESCE(sum(o.cylinder_count), 0)
                   FROM orders o JOIN area a ON a.id = o.area_id
@@ -96,7 +82,6 @@ public class PlanService {
                 """, (rs, i) -> new Rules.DayPlan.AreaLoad(
                         rs.getLong(1), rs.getString(2), rs.getInt(3), rs.getInt(4)));
 
-        // who is in, with how much room left, and the area they covered last
         List<Rules.DayPlan.AgentSlot> slots = jdbc.query("""
                 SELECT u.id, u.full_name,
                        GREATEST(u.daily_order_cap -
@@ -117,7 +102,6 @@ public class PlanService {
 
         Rules.DayPlan.Result result = Rules.DayPlan.plan(areaLoads, slots);
 
-        // cylinders per order, per area, so counts stay proportional on a split
         Map<Long, Double> cylPerOrder = new HashMap<>();
         for (Rules.DayPlan.AreaLoad a : areaLoads) {
             cylPerOrder.put(a.areaId(), a.orders() == 0 ? 1.0 : (double) a.cylinders() / a.orders());
@@ -143,7 +127,6 @@ public class PlanService {
         return new Planned(planId, result);
     }
 
-    /** Manager moves one area to a different agent before confirming. */
     @Transactional
     public PlanView move(Long assignmentId, Long agentId) {
         Long planId = jdbc.queryForObject(
@@ -157,7 +140,6 @@ public class PlanService {
         return view(planId);
     }
 
-    /** Locks the plan in and assigns the orders. */
     @Transactional
     public Map<String, Object> confirm() {
         LocalDate today = LocalDate.now(ZONE);
@@ -199,10 +181,6 @@ public class PlanService {
         return Map.of("status", "confirmed", "ordersAssigned", assigned, "carriedOver", carried);
     }
 
-    /**
-     * Undoes a confirm: orders not yet delivered or failed go back to BOOKED, and the
-     * carry-over counted at confirm is taken back, so confirming again gives the same numbers.
-     */
     @Transactional
     public void reopen() {
         Map<String, Object> plan = jdbc.query(
@@ -214,7 +192,6 @@ public class PlanService {
         }
         Long planId = (Long) plan.get("id");
 
-        // orders that were waiting at confirm time and were counted as carried over
         jdbc.update("""
                 UPDATE orders SET carried_days = carried_days - 1
                  WHERE status = 'BOOKED' AND carried_days > 0 AND booked_at < ?
@@ -229,8 +206,6 @@ public class PlanService {
         jdbc.update("UPDATE day_plan SET status = 'DRAFT', confirmed_at = NULL WHERE id = ?", planId);
         log.info("Reopened plan {}: {} orders released", planId, released);
     }
-
-    /* ---------------- reading ---------------- */
 
     @Transactional(readOnly = true)
     public PlanView today() {
@@ -291,7 +266,6 @@ public class PlanService {
                 totalOrders, capacity, carriedIn);
     }
 
-    /** One paragraph from the LLM; falls back to plain text if it is unavailable. */
     private String writeSummary(Rules.DayPlan.Result result) {
         StringBuilder facts = new StringBuilder();
         facts.append("Total orders: ").append(result.totalOrders())

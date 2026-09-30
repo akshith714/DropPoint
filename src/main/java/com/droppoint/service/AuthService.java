@@ -9,12 +9,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Handles user authentication and multi-role user management (ADMIN, OWNER, MANAGER, AGENT).
- */
 @Service
 public class AuthService {
-
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     public record UserView(Long id, String name, String phone, String role, Long branchId, String pin) { }

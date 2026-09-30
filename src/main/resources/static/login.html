@@ -11,7 +11,6 @@
 <style>
   body { min-height: 100vh; display: grid; grid-template-columns: 1.05fr 1fr; background: var(--surface); }
 
-  /* brand panel */
   .brand-panel {
     position: relative;
     overflow: hidden;
@@ -58,7 +57,6 @@
   .features b { color: #fff; font-weight: 600; display: block; }
   .panel-foot { position: relative; z-index: 1; color: #64748b; font-size: 0.8rem; }
 
-  /* form side */
   .form-side { display: flex; align-items: center; justify-content: center; padding: 40px 24px; background: var(--bg); }
   .login-card { width: 100%; max-width: 400px; }
   .login-card h2 { font-size: 1.5rem; letter-spacing: -0.02em; margin: 0 0 6px; }
@@ -209,7 +207,7 @@ async function handleFormLogin(e) {
 function getRedirectUrl(role) {
   const isMobile = window.innerWidth < 768 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if (role === 'AGENT' && isMobile) return '/mobile.html';
-  if (role === 'AGENT') return '/mobile.html'; // agents always go to mobile portal
+  if (role === 'AGENT') return '/mobile.html';
   return '/index.html';
 }
 
@@ -226,7 +224,7 @@ async function performLogin(phone, pin) {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ phone, pin })
     });
-    
+
     if (res.ok) {
       const user = await res.json();
       localStorage.setItem('dp_user', JSON.stringify(user));
@@ -245,7 +243,6 @@ async function performLogin(phone, pin) {
   }
 }
 
-// Redirect if already logged in
 const saved = localStorage.getItem('dp_user');
 if (saved) {
   try {
@@ -257,4 +254,3 @@ if (saved) {
 
 </body>
 </html>
-

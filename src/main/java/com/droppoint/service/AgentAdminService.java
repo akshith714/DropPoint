@@ -11,13 +11,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Manages agents in the system: adding new agents, editing their details, multiple preferred regular areas,
- * daily order cap, toggling availability, and deactivating agents. No agent names are hardcoded.
- */
 @Service
 public class AgentAdminService {
-
     private static final Logger log = LoggerFactory.getLogger(AgentAdminService.class);
     private static final ZoneId ZONE = ZoneId.of("Asia/Kolkata");
 
@@ -78,11 +73,6 @@ public class AgentAdminService {
     }
 
     @Transactional
-    public AgentItem addAgent(String name, String phone, Integer cap, Long preferredAreaId) {
-        return addAgent(name, phone, cap, preferredAreaId, preferredAreaId != null ? List.of(preferredAreaId) : null);
-    }
-
-    @Transactional
     public AgentItem updateAgent(Long id, String name, String phone, Integer cap, Boolean available, Long preferredAreaId, List<Long> preferredAreaIds) {
         if (name != null && !name.isBlank()) {
             jdbc.update("UPDATE app_user SET full_name = ? WHERE id = ?", name.trim(), id);
@@ -118,11 +108,6 @@ public class AgentAdminService {
         }
         log.info("Updated agent {}", id);
         return getAgent(id);
-    }
-
-    @Transactional
-    public AgentItem updateAgent(Long id, String name, String phone, Integer cap, Boolean available, Long preferredAreaId) {
-        return updateAgent(id, name, phone, cap, available, preferredAreaId, null);
     }
 
     @Transactional
@@ -166,7 +151,7 @@ public class AgentAdminService {
                 (rs, i) -> {
                     Long singlePrefId = rs.getObject(7) == null ? null : rs.getLong(7);
                     String singlePrefName = rs.getString(8);
-                    
+
                     List<Long> finalIds = areaIds.isEmpty() && singlePrefId != null ? List.of(singlePrefId) : areaIds;
                     List<String> finalNames = areaNames.isEmpty() && singlePrefName != null ? List.of(singlePrefName) : areaNames;
 

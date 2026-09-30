@@ -28,17 +28,10 @@ import com.droppoint.repo.Workforce.LocationPing.LocationPingRepository;
 import com.droppoint.repo.Workforce.SosAlert;
 import com.droppoint.repo.Workforce.SosAlert.SosAlertRepository;
 
-/**
- * Everything about an agent's working day: checking in at the branch, checking
- * out, and the position pings recorded in between. Tracking only accepts a ping
- * from an agent who is on duty, which is why the two live together.
- */
 @Service
 public class AgentService {
-
     private static final double MAX_ACCURACY_METRES = 100;
 
-    /** Above this speed between two pings, the movement is physically implausible. */
     private static final double MAX_PLAUSIBLE_KMPH = 150;
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Kolkata");
@@ -82,12 +75,9 @@ public class AgentService {
         this.sosAlerts = sosAlerts;
     }
 
-    // ---- attendance ----
-
     @Transactional
     public CheckInResponse checkIn(Long agentId, double latitude, double longitude,
                                    double accuracyMetres, boolean mockLocation) {
-
         AppUser agent = requireAgent(agentId);
         Branch branch = branches.findById(agent.getBranchId())
                 .orElseThrow(() -> new NoSuchElementException("Branch " + agent.getBranchId() + " not found"));
@@ -115,7 +105,7 @@ public class AgentService {
         if (existing.isPresent()) {
             Attendance a = existing.get();
             if (a.getCheckOutAt() != null) {
-                a.resume();   // saved when the transaction ends (dirty checking)
+                a.resume();
                 return new CheckInResponse(true, "CHECKED_IN", "Welcome back. Your shift is resumed.",
                         distance, a.getId(), a.getCheckInAt());
             }
@@ -149,20 +139,17 @@ public class AgentService {
                     Duration.between(a.getCheckInAt(), a.getCheckOutAt()).toMinutes());
         }
 
-        a.checkOut(now);   // saved automatically when the transaction ends (dirty checking)
+        a.checkOut(now);
 
         return new CheckOutResponse("CHECKED_OUT", "Checked out. Thank you!",
                 a.getId(), a.getCheckInAt(), a.getCheckOutAt(),
                 Duration.between(a.getCheckInAt(), now).toMinutes());
     }
 
-    // ---- tracking ----
-
     @Transactional
     public PingResponse recordPing(Long agentId, double latitude, double longitude,
                                    double accuracyMetres, boolean simulated) {
-
-        GeoPoint here = new GeoPoint(latitude, longitude);   // validates the coordinates
+        GeoPoint here = new GeoPoint(latitude, longitude);
         Instant now = Instant.now();
 
         Optional<Attendance> duty = attendances.findByAgentIdAndWorkDate(
@@ -182,7 +169,7 @@ public class AgentService {
             double metres = new GeoPoint(previous.getLatitude(), previous.getLongitude()).distanceTo(here);
             long seconds = Duration.between(previous.getRecordedAt(), now).getSeconds();
             if (seconds > 0) {
-                speed = Math.round((metres / seconds) * 3.6 * 10) / 10.0;   // m/s to km/h, 1 decimal
+                speed = Math.round((metres / seconds) * 3.6 * 10) / 10.0;
                 suspicious = speed > MAX_PLAUSIBLE_KMPH;
             }
         }
@@ -193,13 +180,10 @@ public class AgentService {
         return new PingResponse(true, suspicious ? "ACCEPTED_SUSPICIOUS" : "ACCEPTED", speed, suspicious);
     }
 
-    // ---- SOS ----
-
     @Transactional
     public SosResponse triggerSos(Long agentId, Double latitude, Double longitude) {
         AppUser agent = requireAgent(agentId);
 
-        // Check if there's already an active SOS for this agent
         List<SosAlert> active = sosAlerts.findByStatusOrderByTriggeredAtDesc(SosAlert.Status.ACTIVE);
         for (SosAlert a : active) {
             if (a.getAgentId().equals(agentId)) {
@@ -260,8 +244,6 @@ public class AgentService {
                 alert.getStatus().name(), alert.getAcknowledgedBy(), alert.getAcknowledgedAt());
     }
 
-    // ---- live location for dashboard ----
-
     @Transactional(readOnly = true)
     public List<AgentLocationView> getAgentLocations() {
         LocalDate today = LocalDate.now(BUSINESS_ZONE);
@@ -279,8 +261,6 @@ public class AgentService {
                     p.getSpeedKmph(), p.isSuspicious());
         }).toList();
     }
-
-    // ---- agent status (for mobile app) ----
 
     @Transactional(readOnly = true)
     public AgentStatusView getAgentStatus(Long agentId) {
@@ -300,8 +280,6 @@ public class AgentService {
         return new AgentStatusView(checkedIn, checkInAt, checkOutAt, lastPingAt, activeSos);
     }
 
-    // ---- shared ----
-
     private AppUser requireAgent(Long agentId) {
         AppUser agent = users.findById(agentId)
                 .orElseThrow(() -> new NoSuchElementException("Agent " + agentId + " not found"));
@@ -320,4 +298,3 @@ public class AgentService {
         };
     }
 }
-

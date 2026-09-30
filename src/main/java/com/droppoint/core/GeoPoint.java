@@ -1,12 +1,6 @@
 package com.droppoint.core;
 
-/**
- * A location on Earth in decimal degrees, with great-circle distance (haversine).
- * Latitude must be between -90 and 90, longitude between -180 and 180.
- */
 public record GeoPoint(double latitude, double longitude) {
-
-    /** Mean radius of the Earth in metres. */
     public static final double EARTH_RADIUS_METRES = 6_371_000.0;
 
     public GeoPoint {
@@ -18,7 +12,6 @@ public record GeoPoint(double latitude, double longitude) {
         }
     }
 
-    /** Distance to another point in metres, accurate to about 0.5%. */
     public double distanceTo(GeoPoint other) {
         if (other == null) {
             throw new IllegalArgumentException("Other point is required");
